@@ -8,6 +8,12 @@ Full detail lives in each linked file.
 
 ## Pending
 
+- [task-service-account.md](task-service-account.md) — **The one part of v1's security story that is
+  designed but not installed.** Until `_vaultd` exists, the store is protected by encryption at rest
+  and by convention, not by the kernel, which means an agent running as you is stopped by nothing but
+  the master key living in a file it has no reason to open. Needs sudo, so it needs you. Steps 4 and
+  5 are mine and I can do them the moment the account exists.
+
 - [task-three-open-decisions.md](task-three-open-decisions.md) — **All three answered 2026-08-17,
   build unblocked.** Both-endpoint-first for HTTPS interception, native Rust for the proxy, CLI
   first for v1. Answers and their consequences are written into the file, and HANDOFF.md §11 now

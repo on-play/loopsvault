@@ -533,6 +533,13 @@ The biggest architecture fork.
 The v1 line sits after step 5. Steps 1 to 5 are v1. Steps 6 to 9 are v2, with one caveat noted
 below.
 
+> **Status 2026-08-17: steps 1 to 5 are built and verified. v1 works.**
+> One piece of step 3 is outstanding and it is the one that matters most: the `_vaultd` service
+> account and the launchd plist are designed but **not installed**, because they need sudo and
+> change system state outside any project. Until they are, the store is protected by encryption at
+> rest and by convention, not by the kernel. Tracked in `founder/task-service-account.md`.
+> Everything else in steps 1 to 5 is done, tested both directions, and committed.
+
 1. **Fix `block-env-access.sh` first.** Allow pure discovery, make denials name the next step. Ten
    minutes, no dependencies, and it removes the daily friction immediately.
 2. **Inventory and classify.** Every variable name across all projects, which projects share it,
