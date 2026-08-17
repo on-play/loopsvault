@@ -8,11 +8,10 @@ Full detail lives in each linked file.
 
 ## Pending
 
-- [task-three-open-decisions.md](task-three-open-decisions.md) — **BLOCKS ALL BUILD WORK.** Three
-  architecture decisions were deliberately left open when the design moved out of the PitchPlus
-  session on 2026-08-17: how the proxy intercepts HTTPS, whether to write the proxy in Rust or wrap
-  Infisical's Agent Vault, and what ships in v1. Each has a recommendation. Nothing should be built
-  until the founder answers.
+- [task-three-open-decisions.md](task-three-open-decisions.md) — **All three answered 2026-08-17,
+  build unblocked.** Both-endpoint-first for HTTPS interception, native Rust for the proxy, CLI
+  first for v1. Answers and their consequences are written into the file, and HANDOFF.md §11 now
+  carries the summary table. Left `pending` because only the founder flips a task to `finished`.
 
 - [task-fix-block-env-hook.md](task-fix-block-env-hook.md) — **Ten minutes, no dependencies, do it
   regardless of the decisions above.** `~/.claude/scripts/block-env-access.sh` denies any Bash

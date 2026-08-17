@@ -17,6 +17,12 @@ See [TODO.md](TODO.md) for the consolidated task list.
 
 ### Decisions
 
+- HTTPS interception: both, endpoint first. v1 is the explicit local endpoint only; MITM is opt-in,
+  per-tool, off by default, and lands after v1 (2026-08-17, in HANDOFF.md §11)
+- Proxy implementation: native Rust. Agent Vault is a reference design, not a dependency
+  (2026-08-17, in HANDOFF.md §11)
+- v1 scope: CLI first, GUI after. Daemon + CLI + catalog + endpoint proxy + per-project attribution.
+  SwiftUI, Secure Enclave, Touch ID and honeytokens are v2 (2026-08-17, in HANDOFF.md §11)
 - Stack: Rust daemon + Swift/SwiftUI GUI over a Unix domain socket (2026-08-17, in HANDOFF.md §7)
 - License: MIT (2026-08-17)
 - Platform floor: macOS first, Apple Silicon as a product choice not a hardware limit

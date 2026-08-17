@@ -41,7 +41,17 @@ Ship A in v1, add opt-in B later for tools whose base URL cannot be changed.
 - Never stuck.
 - Cost: more work, two code paths.
 
-**Answer:**
+**Answer: Option C, both, endpoint first.** (2026-08-17)
+
+What this binds:
+- v1 ships the explicit local endpoint only. No CA certificate is created, installed, or trusted by
+  anything in v1.
+- MITM is a later, opt-in, per-tool mode. It is off by default and the CA is installed only on an
+  explicit founder command, never as a side effect of install or first run.
+- Design constraint that follows: credential injection and exact host matching are written **once**,
+  in a core both transports call. Two code paths for transport, one code path for the decision about
+  which credential goes to which host. If that rule is broken, the wildcard bug this project fears
+  most gets two chances to exist instead of one.
 
 ---
 
@@ -65,7 +75,15 @@ Prove the workflow on Agent Vault, swap in Rust once validated by real use.
 - Lowest risk.
 - Cost: some work done twice.
 
-**Answer:**
+**Answer: Option A, native Rust.** (2026-08-17)
+
+What this binds:
+- Agent Vault is read as a reference design, not run as a dependency. No Go binary is shipped or
+  wrapped.
+- The 2 to 3 week estimate is accepted knowingly, with the revenue trade in HANDOFF.md §13 already
+  acknowledged. Do not re-litigate it.
+- Since we own the request path from the first commit, the per-project meter goes in at the same
+  time as injection rather than being retrofitted around someone else's proxy.
 
 ---
 
@@ -82,7 +100,20 @@ Complete system at once. Much longer before anything works, and design mistakes 
 One key (OpenRouter), one project (`pitchplus_fast`), daemon + minimal GUI + Touch ID unlock.
 Proves every layer including the Apple hardware, then broaden.
 
-**Answer:**
+**Answer: Option A, CLI first, GUI after.** (2026-08-17)
+
+What this binds:
+- v1 is daemon + CLI + catalog + explicit-endpoint proxy + per-project attribution. That is the
+  whole of v1.
+- SwiftUI app, Secure Enclave wrapping, Touch ID and honeytokens are v2. Honeytokens are cheap and
+  high value, so they are the first thing pulled forward if v1 lands early.
+- Known risk carried by this choice: the Apple hardware path (Secure Enclave, `biometryCurrentSet`,
+  the break-glass export) stays unproven until v2. Mitigation is that v1's store encryption must be
+  written so the master key is **wrapped by a pluggable unwrapper** from the first commit, with a
+  file-based unwrapper in v1 and the Enclave unwrapper dropped in for v2. If v1 hardcodes how the
+  key is unwrapped, v2 becomes a rewrite of the storage layer.
+- Second consequence: the break-glass export is not a v2 feature. Its format is designed in v1,
+  because a store written in v1 must still be recoverable after the Enclave lands.
 
 ---
 

@@ -9,20 +9,22 @@ prior art already researched, the honest security model, and the facts verified 
 **Read it in full before your first substantive action.** It exists so you do not re-research, do
 not re-propose dead ideas, and do not rediscover constraints the hard way.
 
-## Three decisions block the build
+## The three blocking decisions are answered (2026-08-17)
 
-`founder/task-three-open-decisions.md` holds three architecture questions that were deliberately
-left unanswered:
+1. **HTTPS interception: both, endpoint first.** v1 is the explicit local endpoint only. No CA is
+   created or installed in v1. MITM comes later, opt-in, per-tool, off by default.
+2. **Proxy: native Rust.** Infisical's Agent Vault is a reference design, never a dependency.
+3. **v1 scope: CLI first, GUI after.** v1 is daemon + CLI + catalog + endpoint proxy + per-project
+   attribution. SwiftUI, Secure Enclave, Touch ID and honeytokens are v2.
 
-1. How the proxy intercepts HTTPS (explicit local endpoint vs MITM with a local CA)
-2. Whether the proxy is written in Rust or wraps Infisical's Agent Vault
-3. What ships in v1
+Reasoning in `founder/task-three-open-decisions.md`, summary table in HANDOFF.md §11. Three
+constraints follow from these and must not be quietly undone: one injection core shared by both
+transports, a pluggable master-key unwrapper from the first commit, and a break-glass export format
+designed in v1 rather than v2.
 
-Each has a recommendation. **None is decided.** Ask the founder and record the answers in that file
-before writing implementation code.
-
-Two things are safe to do regardless: `founder/task-fix-block-env-hook.md` (ten minutes, no
-dependencies) and `founder/task-inventory-and-classify.md` (needs founder participation).
+Next up: `founder/task-fix-block-env-hook.md` (ten minutes, no dependencies) and
+`founder/task-inventory-and-classify.md` (needs founder participation, and it is what makes
+everything after it easy).
 
 ## What this project is
 

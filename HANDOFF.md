@@ -4,8 +4,8 @@
 > conversation held on 2026-08-17. Everything below was researched, verified, or decided.
 > Do not re-research what is marked verified. Do not re-propose what is marked rejected.
 >
-> **Your first action is to ask the founder the three open decisions in the section
-> "Three Open Decisions". Nothing should be built before those are answered.**
+> **The three decisions in §11 were answered on 2026-08-17. The build is unblocked.** Read §11 for
+> the answers and the three constraints that follow from them before writing any code.
 
 - **Project:** LoopsVault
 - **Domain:** loopsvault.com
@@ -442,11 +442,34 @@ one of the build and needs the founder's participation or an explicit adjustment
 
 ---
 
-## 11. Three Open Decisions
+## 11. Three Decisions (ANSWERED 2026-08-17)
 
-**Ask these first. Do not build before they are answered.** They were presented on 2026-08-17 and
+**All three are decided. The build is unblocked.** They were presented on 2026-08-17 and
 deliberately left open so the decision could be made in the LoopsVault project rather than in
-PitchPlus.
+PitchPlus. The founder answered them in the first LoopsVault session on the same day.
+
+**The answers, in one place:**
+
+| # | Decision | Answer |
+|---|---|---|
+| 1 | HTTPS interception | **Option C: both, endpoint first.** v1 is explicit local endpoint only. MITM is opt-in, per-tool, off by default, and lands after v1. |
+| 2 | Proxy implementation | **Option A: native Rust.** Agent Vault is a reference design, not a dependency. |
+| 3 | v1 scope | **Option A: CLI first, GUI after.** v1 is daemon + CLI + catalog + endpoint proxy + per-project attribution. |
+
+**Three constraints that follow, and that a later session must not undo:**
+
+1. **One injection core, two transports.** The endpoint path and the eventual MITM path share a
+   single implementation of "which credential may go to which host." Exact host matching is written
+   once. Duplicating it gives the one bug class that actually leaks a key two places to live.
+2. **The master key unwrapper is pluggable from the first commit.** v1 uses a file-based unwrapper
+   because Secure Enclave work is v2. If v1 hardcodes the unwrap path, v2 becomes a rewrite of the
+   storage layer rather than a drop-in.
+3. **The break-glass export format is designed in v1, not v2.** A store written in v1 must still be
+   recoverable after the Enclave lands. See the `biometryCurrentSet` gotcha in §7.
+
+Full reasoning for each answer is recorded in
+[`founder/task-three-open-decisions.md`](founder/task-three-open-decisions.md). The original option
+sets are kept below, unedited, so a later reader can see what was traded away.
 
 ### Decision 1: How does the proxy intercept HTTPS?
 
@@ -487,7 +510,10 @@ The biggest architecture fork.
 
 ---
 
-## 12. Suggested build order (after the decisions land)
+## 12. Build order (decisions have landed, this is live)
+
+The v1 line sits after step 5. Steps 1 to 5 are v1. Steps 6 to 9 are v2, with one caveat noted
+below.
 
 1. **Fix `block-env-access.sh` first.** Allow pure discovery, make denials name the next step. Ten
    minutes, no dependencies, and it removes the daily friction immediately.
@@ -496,12 +522,19 @@ The biggest architecture fork.
    because of the guard.** This is the work that makes everything after it easy.
 3. **Daemon skeleton:** encrypted store, service account, launchd plist, Unix socket, catalog read
    API.
-4. **Proxy and injection**, with exact host matching from the very first commit.
+4. **Proxy and injection**, explicit local endpoint only, with exact host matching from the very
+   first commit and a single injection core the later MITM transport will reuse.
 5. **Per-project tokens and the meter.**
-6. **Honeytokens and alarms** (build early, they are cheap and high value).
+
+   *(end of v1)*
+
+6. **Honeytokens and alarms.** Cheap and high value, so this is the first thing pulled forward into
+   v1 if the schedule allows. It is listed under v2 only because Decision 3 drew the line there.
 7. **Harness adapters** for Claude Code, Codex, OpenClaw.
-8. **SwiftUI app**, Secure Enclave wrapping, Touch ID, break-glass export.
-9. **Linux server path** for the daemon.
+8. **SwiftUI app**, Secure Enclave wrapping, Touch ID, break-glass export. The export **format** is
+   designed during v1 even though the app is v2, because a v1 store must stay recoverable.
+9. **Opt-in MITM transport**, per-tool, off by default, reusing the v1 injection core.
+10. **Linux server path** for the daemon.
 
 ---
 
