@@ -1,0 +1,22 @@
+[package]
+name = "loopsvault-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The loopsvault command line."
+
+[[bin]]
+name = "loopsvault"
+path = "src/main.rs"
+
+[dependencies]
+loopsvault-core = { path = "../loopsvault-core" }
+loopsvaultd = { path = "../loopsvaultd" }
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "blocking"] }
+rpassword = "7"
