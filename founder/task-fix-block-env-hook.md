@@ -50,3 +50,42 @@ behaviour the founder described as the reason LoopsVault should exist.
 - Every denial message names a specific command the agent should run instead.
 - Verify the **pass case**, not just the block case. Per the founder's standing rule, a guard is
   not shipped until the thing it is supposed to allow has been proven to actually work.
+
+---
+
+## Done 2026-08-17, awaiting founder verification
+
+Built in `tools/env-guard/`, installed to `~/.claude/scripts/`. The hook wiring in
+`~/.claude/settings.json` was NOT touched: it already pointed at that path. The previous guard was
+backed up to `~/.claude/scripts/block-env-access.sh.bak-20260817-134715`.
+
+**The line moved from the filename to the `=` sign.** Left of it (which files exist, which
+variables, how many, how long a value is) is inventory an agent needs. Right of it is the secret.
+
+- `bash tools/env-guard/test-guard.sh` - 95 assertions, both directions, all green.
+- Live end-to-end: `find /Users/jain.jagi/Projects -maxdepth 3 -name ".env*" -type f` now runs
+  through the real hook and returned 70 files. That is the exact command that was blocked during
+  the design session.
+- New capability `env-keys.sh` prints variable NAMES and never values, in three modes (names,
+  `--shape` for length plus character class, `--count`). Every denial message names it, with the
+  path already filled in.
+- Value reads stayed exactly as strict. 18 adversarial bypasses were tried and all denied,
+  including `echo $(cat .env)`, backticks, `bash -c`, `find -exec cat`, `xargs cat`,
+  `while read f; do cat $f; done`, `\cat`, `CAT=cat; $CAT .env`, and interpreter one-liners.
+- One thing got **stricter**, and it was not in the original scope: `ls > .env` was previously
+  allowed and would truncate an env file. Now denied by a redirect check. Flagging it because it
+  is the one behaviour change in the deny direction.
+
+**Verify by running these two yourself:**
+
+```
+find ~/Projects -maxdepth 2 -name ".env*" -type f     # should list files
+cat ~/Projects/pitchplus_fast/.env                    # should deny, and name env-keys.sh
+```
+
+Left at `pending`. Only the founder flips a task to `finished`.
+
+**Found and deliberately not fixed:** the guard has never covered `printenv` / `echo $VAR` / `env`,
+because those contain no `.env` string. Closing that changes what is denied, which this task was not
+allowed to do. Recorded as [task-guard-covers-process-env.md](task-guard-covers-process-env.md)
+with a recommendation.
