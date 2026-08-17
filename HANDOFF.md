@@ -216,8 +216,26 @@ For every entry:
 | `expiry` | optional, drives proactive rotation warnings |
 | `projects[]` | which projects are permitted to use it |
 | `shape` | e.g. `sk-or-v1-`, length, so agents can validate without values |
-| `classification` | `secret` or `decided-constant` (see below) |
+| `classification` | `secret`, `constant`, `public`, or `review` (see below) |
 | `hosts[]` | exact hosts this credential may ever be sent to |
+| `aliases[]` | other variable names that mean this same credential |
+
+**`aliases[]` was added on 2026-08-17 after the inventory ran, and it is not
+cosmetic.** The same Anthropic credential lives in these projects under two
+different names, `ANTHROPIC_API_KEY` in six projects and `CLAUDE_API_KEY` in
+four. Without aliases the vault either holds the same secret twice, which
+recreates the rotation problem it exists to solve, or it forces a rename across
+ten repositories before anything can be adopted. One entry with two names costs
+nothing and makes adoption incremental. Expect more of these: the inventory also
+found `GEMINI_*` alongside `GOOGLE_*` for the same provider.
+
+**`classification` gained `public` for the same reason.** The inventory found 53
+distinct names carrying `NEXT_PUBLIC_`, `VITE_`, `NUXT_PUBLIC_` or equivalent
+prefixes. A framework compiles those into a browser bundle, so the value is
+served to every visitor. They are not secrets no matter what they are named, and
+a name like `NEXT_PUBLIC_..._SECRET` is a naming error rather than a credential.
+Collapsing them into `constant` would lose that distinction, and it is worth
+keeping because it is the one class the vault can refuse to store on principle.
 
 Agents read this freely. They can answer "what keys exist, what are they for, which are expiring"
 without any privileged operation.

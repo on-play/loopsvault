@@ -3,8 +3,13 @@ title: Inventory every env variable across all projects and classify it
 status: pending
 category: task
 created: 2026-08-17
-related: [../HANDOFF.md, task-fix-block-env-hook.md]
+related: [../HANDOFF.md, task-fix-block-env-hook.md, task-inventory-findings.md]
 ---
+
+> **Ran 2026-08-17.** Fixing the guard first made this self-serve, so it did not need founder
+> participation after all. Results and the three calls it surfaced are in
+> [task-inventory-findings.md](task-inventory-findings.md). Tools are in `tools/inventory/`.
+> Left `pending` because only the founder flips a task to `finished`.
 
 # Inventory and classify
 

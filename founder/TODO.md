@@ -20,6 +20,16 @@ Full detail lives in each linked file.
   mechanical cause of agents writing workaround scripts. Allow discovery, make the denial point at
   the next step.
 
+- [task-inventory-findings.md](task-inventory-findings.md) — **Three calls the inventory surfaced.**
+  One is a security question and costs a minute: `CLAUDE_API_KEY_OLD` is sitting in a live env file.
+  The others are the 133 ambiguous names needing your pass, and whether to normalise
+  `ANTHROPIC_API_KEY` vs `CLAUDE_API_KEY` rather than carry aliases forever.
+
+- [task-guard-covers-process-env.md](task-guard-covers-process-env.md) — The env guard covers files
+  but has never covered `printenv` / `echo $VAR` / `env`, because those contain no `.env` string.
+  Closing it changes what is denied, so it is a decision rather than a fix. Recommendation is in the
+  file.
+
 - [task-inventory-and-classify.md](task-inventory-and-classify.md) — **Step one of the real build.**
   Every variable name across all projects, which projects share which, and secret versus decided
   constant. Output is the first catalog. Needs founder participation because the guard blocks the
