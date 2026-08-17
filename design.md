@@ -17,7 +17,7 @@ interface or artifact. Amend it intentionally. Do not create page-specific palet
 ## System
 
 - Genre: modern-minimal
-- Macrostructure: Map / Diagram
+- Marketing macrostructure: Split Studio
 - Theme: custom, "protected, local, exact, native"
 - Axes: light / system-native / cool
 - Primary action: understand the boundary, then read the CLI quick start
@@ -73,7 +73,7 @@ status, small labels, and the wordmark use system mono. Never italicize headings
 - Borders: one visible 1 px rule, never card inside card
 - Primary CTA: off-white surface, black border, compact rectangle, monospace label
 - Focus: 2 px Focus Blue outline, 4 px offset, visible immediately
-- Information architecture: maps, spec rows, and ordered roadmap entries before feature cards
+- Information architecture: paired claim-and-proof sections, spec rows, and ordered roadmap entries before feature cards
 
 ## Voice
 
@@ -87,7 +87,7 @@ status, small labels, and the wordmark use system mono. Never italicize headings
 
 ## Motion stance
 
-- One five-node entrance may establish the trust map
+- One paired entrance may establish the opening claim and protected path
 - Buttons may move by 1 px on hover and active press
 - No parallax, looping decoration, ambient glow, or section-by-section reveal
 - Reduced motion: all spatial motion is removed or reduced to at most 120 ms

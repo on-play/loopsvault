@@ -12,156 +12,101 @@
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
 
-    <header class="site-header" aria-label="Primary navigation">
+    <header class="site-nav" aria-label="Primary navigation">
       <a class="wordmark" href="#top" aria-label="LoopsVault home">
         <img src="../brand/logo-mark.svg" width="28" height="28" alt="">
         <span>LoopsVault</span>
       </a>
-      <a class="button button-compact" href="https://github.com/on-play/loopsvault" target="_blank" rel="noreferrer">
-        View source <span aria-hidden="true">↗</span>
+      <nav class="nav-links" aria-label="Page sections">
+        <a href="#boundary">Boundary</a>
+        <a href="#scope">Scope</a>
+        <a href="#brand">System</a>
+      </nav>
+      <a class="nav-action" href="https://github.com/on-play/loopsvault" target="_blank" rel="noreferrer">
+        Source <span aria-hidden="true">↗</span>
       </a>
     </header>
 
     <main id="main">
-      <section class="hero" id="top" aria-labelledby="hero-title">
-        <div class="hero-intro">
-          <div>
-            <p class="orientation">Agent → vault → provider</p>
-            <h1 id="hero-title">Use secrets.<br>Never see them.</h1>
-          </div>
+      <section class="hero page-grid" id="top" aria-labelledby="hero-title">
+        <div class="hero-copy hero-enter">
+          <h1 id="hero-title">Use secrets.<br>Never see them.</h1>
           <p class="hero-lede">
             LoopsVault is a local encrypted vault for AI coding agents. The agent asks for an
             operation. The vault attaches the credential at the boundary. The value never enters
             the project process, terminal output, or model context.
           </p>
+          <a class="button button-primary" href="https://github.com/on-play/loopsvault#quick-start" target="_blank" rel="noreferrer">
+            Read quick start <span aria-hidden="true">↗</span>
+          </a>
         </div>
 
-        <a class="button hero-action" href="https://github.com/on-play/loopsvault#quick-start" target="_blank" rel="noreferrer">
-          Read the quick start <span aria-hidden="true">↗</span>
-        </a>
+        <aside class="hero-proof hero-enter" aria-labelledby="path-title">
+          <div class="proof-heading">
+            <h2 id="path-title">The protected path</h2>
+            <span class="proof-state">Local boundary</span>
+          </div>
+          <ol class="trust-path">
+            <li>
+              <span class="path-index">01</span>
+              <div>
+                <strong>Agent requests an operation</strong>
+                <p>Placeholder credential, project token, exact destination.</p>
+              </div>
+            </li>
+            <li class="path-vault">
+              <span class="path-index">02</span>
+              <div>
+                <strong><code>loopsvaultd</code> injects in memory</strong>
+                <p>The real value exists here, inside the trusted local process.</p>
+              </div>
+            </li>
+            <li>
+              <span class="path-index">03</span>
+              <div>
+                <strong>Provider receives the request</strong>
+                <p>Only after exact host matching succeeds.</p>
+              </div>
+            </li>
+          </ol>
+          <p class="proof-result"><span aria-hidden="true">✓</span> The secret never enters agent context.</p>
+        </aside>
       </section>
 
-      <section class="map-section" aria-label="Credential boundary diagram">
-        <figure class="trust-map" aria-labelledby="map-title" aria-describedby="map-description">
-          <figcaption>
-            <span id="map-title">The credential boundary</span>
-            <span id="map-description">Five components, one local process where the secret exists in memory</span>
-          </figcaption>
-
-          <div class="map-canvas">
-            <article class="map-node node-agent">
-              <div class="node-heading">
-                <span class="node-dot" aria-hidden="true"></span>
-                <p>Project process</p>
-              </div>
-              <h2>AI agent</h2>
-              <ul>
-                <li>Placeholder credential</li>
-                <li>Project token</li>
-                <li>Requested operation</li>
-              </ul>
-            </article>
-
-            <div class="map-edge edge-av" aria-hidden="true">
-              <span>request</span>
-            </div>
-
-            <article class="map-node node-vault">
-              <div class="node-heading">
-                <span class="node-dot" aria-hidden="true"></span>
-                <p>Trusted boundary</p>
-              </div>
-              <h2>loopsvaultd</h2>
-              <p>Resolve the project. Match the host exactly. Inject the real credential here.</p>
-              <div class="vault-meter">
-                <span>meter</span>
-                <strong>calls · tokens · cost</strong>
-              </div>
-            </article>
-
-            <div class="map-edge edge-vp" aria-hidden="true">
-              <span>credential attached</span>
-            </div>
-
-            <article class="map-node node-provider">
-              <div class="node-heading">
-                <span class="node-dot" aria-hidden="true"></span>
-                <p>Allowed destination</p>
-              </div>
-              <h2>Provider API</h2>
-              <ul>
-                <li>Exact host only</li>
-                <li>Normal upstream response</li>
-                <li>No vault access</li>
-              </ul>
-            </article>
-
-            <article class="map-node node-catalog">
-              <div class="node-heading">
-                <span class="node-dot" aria-hidden="true"></span>
-                <p>Agent readable</p>
-              </div>
-              <h2>Plaintext catalog</h2>
-              <p>Names, purpose, aliases, shape, expiry, projects, and allowed hosts. Never values.</p>
-            </article>
-
-            <div class="map-edge edge-cat" aria-hidden="true">
-              <span>describe</span>
-            </div>
-
-            <article class="map-node node-store">
-              <div class="node-heading">
-                <span class="node-dot" aria-hidden="true"></span>
-                <p>Vault only</p>
-              </div>
-              <h2>Encrypted store</h2>
-              <p>Write-only credentials at rest. No read-back command exists.</p>
-            </article>
-
-            <div class="map-edge edge-store" aria-hidden="true">
-              <span>unwrap in boundary</span>
-            </div>
+      <section class="split-section page-grid" id="boundary" aria-labelledby="boundary-title">
+        <div class="split-copy">
+          <p class="split-statement">Use is not read access.</p>
+          <div class="split-copy-body">
+            <h2 id="boundary-title">A boundary, not a blindfold.</h2>
+            <p>
+              The agent gets the capability and catalog context it needs. It does not receive
+              ciphertext, a decryption key, or a hidden read path.
+            </p>
           </div>
+        </div>
 
-          <div class="map-legend" aria-label="Diagram legend">
-            <span><i class="legend-agent" aria-hidden="true"></i> Agent visible</span>
-            <span><i class="legend-vault" aria-hidden="true"></i> Trusted boundary</span>
-            <span><i class="legend-secret" aria-hidden="true"></i> Secret in use</span>
-          </div>
-        </figure>
-      </section>
-
-      <section class="section boundary" id="boundary" aria-labelledby="boundary-title">
-        <header class="section-intro">
-          <h2 id="boundary-title">A boundary, not a blindfold.</h2>
-          <p>
-            The agent gets the capability it needs and enough catalog context to choose it correctly.
-            It does not receive ciphertext, a decryption key, or a hidden read path.
-          </p>
-        </header>
-
-        <dl class="spec-sheet">
-          <div class="spec-row">
+        <dl class="boundary-spec" aria-label="Credential boundary specifications">
+          <div>
             <dt>Agent context</dt>
-            <dd>Names, descriptions, aliases, value shape, expiry, project access</dd>
-            <dd class="spec-note">Never the secret value</dd>
+            <dd>Names, aliases, shape, expiry, and project access</dd>
+            <dd class="spec-note">Never the value</dd>
           </div>
-          <div class="spec-row">
-            <dt>Injection rule</dt>
+          <div>
+            <dt>Injection</dt>
             <dd>One shared core with exact host matching</dd>
             <dd class="spec-note">No suffixes or wildcards</dd>
           </div>
-          <div class="spec-row">
-            <dt>Project identity</dt>
+          <div>
+            <dt>Identity</dt>
             <dd>Cryptographic project token</dd>
             <dd class="spec-note">Not a claimed project name</dd>
           </div>
-          <div class="spec-row">
+          <div>
             <dt>Read-back</dt>
-            <dd>No <code>loopsvault get</code> command</dd>
-            <dd class="spec-note">Replace a credential to rotate it</dd>
+            <dd>No <code>loopsvault get</code> command exists</dd>
+            <dd class="spec-note">Replace to rotate</dd>
           </div>
-          <div class="spec-row">
+          <div class="spec-limit">
             <dt>Honest limit</dt>
             <dd>Root can read daemon memory and disable detectors</dd>
             <dd class="spec-note">Damage can be bounded and made loud</dd>
@@ -169,108 +114,96 @@
         </dl>
       </section>
 
-      <section class="section scope" id="scope" aria-labelledby="scope-title">
-        <header class="section-intro section-intro-narrow">
-          <h2 id="scope-title">The roadmap keeps the boundary intact.</h2>
-          <p>
-            New interfaces change where LoopsVault runs, not who receives the credential. The same
-            injection core and catalog model carry forward.
-          </p>
-        </header>
+      <section class="scope-section" id="scope" aria-labelledby="scope-title">
+        <div class="page-grid scope-grid">
+          <div class="scope-copy">
+            <h2 id="scope-title">The interface changes. The boundary does not.</h2>
+            <p>
+              New surfaces reuse the same injection core and catalog model. Product status stays
+              separate from brand portability.
+            </p>
+          </div>
 
-        <ol class="roadmap">
-          <li class="roadmap-current">
-            <span class="roadmap-when">Now</span>
-            <h3>Daemon and CLI</h3>
-            <p>Encrypted store, plaintext catalog, endpoint proxy, project tokens, usage metering, and exact host matching.</p>
-            <span class="roadmap-state">Working</span>
-          </li>
-          <li>
-            <span class="roadmap-when">Next</span>
-            <h3>Native macOS control</h3>
-            <p>SwiftUI, Secure Enclave wrapping, Touch ID, desktop alarm notifications, and a durable audit log.</p>
-            <span class="roadmap-state">Designed</span>
-          </li>
-          <li>
-            <span class="roadmap-when">Then</span>
-            <h3>More harnesses and transports</h3>
-            <p>Adapters for Claude Code, Codex, and OpenClaw, plus opt-in HTTPS interception that reuses the injection core.</p>
-            <span class="roadmap-state">Planned</span>
-          </li>
-          <li>
-            <span class="roadmap-when">Open</span>
-            <h3>Additional desktop surfaces</h3>
-            <p>Windows and Linux interfaces can consume the brand system below. Their product schedules are not committed.</p>
-            <span class="roadmap-state">Brand-ready</span>
-          </li>
-        </ol>
+          <ol class="roadmap">
+            <li class="roadmap-current">
+              <span class="roadmap-when">Now</span>
+              <div>
+                <h3>Daemon and CLI</h3>
+                <p>Encrypted store, endpoint proxy, project tokens, metering, and exact host matching.</p>
+              </div>
+              <span class="roadmap-state">Working</span>
+            </li>
+            <li>
+              <span class="roadmap-when">Next</span>
+              <div>
+                <h3>Native macOS control</h3>
+                <p>SwiftUI, Secure Enclave wrapping, Touch ID, notifications, and a durable audit log.</p>
+              </div>
+              <span class="roadmap-state">Designed</span>
+            </li>
+            <li>
+              <span class="roadmap-when">Then</span>
+              <div>
+                <h3>Harnesses and transports</h3>
+                <p>Adapters for Claude Code, Codex, and OpenClaw, plus opt-in HTTPS interception.</p>
+              </div>
+              <span class="roadmap-state">Planned</span>
+            </li>
+            <li>
+              <span class="roadmap-when">Open</span>
+              <div>
+                <h3>Windows and Linux surfaces</h3>
+                <p>The brand system is ready. Product schedules are not committed.</p>
+              </div>
+              <span class="roadmap-state">Brand-ready</span>
+            </li>
+          </ol>
+        </div>
       </section>
 
-      <section class="section brand-system" id="brand" aria-labelledby="brand-title">
-        <div class="brand-showcase">
-          <div class="brand-mark-panel">
-            <img src="../brand/logo-mark.svg" width="176" height="176" alt="LoopsVault logo mark">
-          </div>
-          <div class="brand-rationale">
-            <p class="orientation">The mark</p>
-            <h2 id="brand-title">Two loops. One protected value.</h2>
-            <p>
-              Opposing loops form the operating boundary. The blue square is the credential: small,
-              contained, and used without being exposed. The geometry remains legible as a favicon,
-              menu-bar item, installer icon, or monochrome system glyph.
-            </p>
-            <div class="swatches" aria-label="Brand colors">
-              <span class="swatch swatch-ink"><i aria-hidden="true"></i><code>#000000</code></span>
-              <span class="swatch swatch-paper"><i aria-hidden="true"></i><code>#FBFBFB</code></span>
-              <span class="swatch swatch-blue"><i aria-hidden="true"></i><code>#124EC5</code></span>
-            </div>
-          </div>
+      <section class="brand-section page-grid" id="brand" aria-labelledby="brand-title">
+        <div class="brand-visual" aria-label="LoopsVault logo specimen">
+          <img src="../brand/logo-mark-inverse.svg" width="180" height="180" alt="LoopsVault logo mark" loading="lazy">
+          <p>Two loops protect one value.</p>
         </div>
 
-        <div class="platforms" aria-labelledby="platform-title">
-          <header class="platform-heading">
-            <h3 id="platform-title">One system, native on every surface.</h3>
-            <p>System UI for interface text. System mono for credentials, commands, status, and technical metadata.</p>
-          </header>
+        <div class="brand-content">
+          <div class="brand-intro">
+            <h2 id="brand-title">One system, native on every surface.</h2>
+            <p>
+              System UI carries interface text. System mono carries credentials, commands, status,
+              and technical metadata. The mark stays legible from a favicon to a desktop installer.
+            </p>
+          </div>
+
+          <div class="swatches" aria-label="Brand colors">
+            <span class="swatch-item swatch-item-ink"><code>#000000</code><small>Ink</small></span>
+            <span class="swatch-item swatch-item-paper"><code>#FBFBFB</code><small>Paper</small></span>
+            <span class="swatch-item swatch-item-blue"><code>#124EC5</code><small>Vault Blue</small></span>
+          </div>
+
           <dl class="platform-list">
-            <div>
-              <dt>Web</dt>
-              <dd><code>tokens.css</code></dd>
-              <dd>Ready</dd>
-            </div>
-            <div>
-              <dt>macOS</dt>
-              <dd>SwiftUI semantic colors and system fonts</dd>
-              <dd>Mapped</dd>
-            </div>
-            <div>
-              <dt>Windows</dt>
-              <dd>WinUI theme resources and Segoe UI</dd>
-              <dd>Mapped</dd>
-            </div>
-            <div>
-              <dt>Linux</dt>
-              <dd>libadwaita CSS variables and system fonts</dd>
-              <dd>Mapped</dd>
-            </div>
-            <div>
-              <dt>Agents</dt>
-              <dd><code>design.md</code> and DTCG tokens</dd>
-              <dd>Ready</dd>
-            </div>
+            <div><dt>Web</dt><dd><code>tokens.css</code></dd><dd class="platform-state">Ready</dd></div>
+            <div><dt>macOS</dt><dd>SwiftUI semantic resources</dd><dd class="platform-state">Mapped</dd></div>
+            <div><dt>Windows</dt><dd>WinUI theme resources</dd><dd class="platform-state">Mapped</dd></div>
+            <div><dt>Linux</dt><dd>Toolkit-native resources</dd><dd class="platform-state">Mapped</dd></div>
+            <div><dt>Agents</dt><dd><code>design.md</code> and DTCG tokens</dd><dd class="platform-state">Ready</dd></div>
           </dl>
-          <a class="text-link" href="../design.md">Read the brand contract <span aria-hidden="true">→</span></a>
+
+          <a class="button button-secondary" href="../design.md">
+            Read brand contract <span aria-hidden="true">→</span>
+          </a>
         </div>
       </section>
     </main>
 
-    <footer class="site-footer">
-      <p class="footer-statement">A credential can do its job without entering the conversation.</p>
-      <div class="footer-meta">
-        <a class="wordmark wordmark-inverse" href="#top">
-          <img src="../brand/logo-mark-inverse.svg" width="24" height="24" alt="">
+    <footer class="site-footer" id="site-footer">
+      <div class="footer-inner">
+        <a class="wordmark wordmark-footer" href="#top" aria-label="Back to top">
+          <img src="../brand/logo-mark-inverse.svg" width="24" height="24" alt="" loading="lazy">
           <span>LoopsVault</span>
         </a>
+        <p>A credential can do its job without entering the conversation.</p>
         <div class="footer-links">
           <a href="https://github.com/on-play/loopsvault" target="_blank" rel="noreferrer">Source ↗</a>
           <a href="../design.md">Brand system</a>
