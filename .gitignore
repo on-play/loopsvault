@@ -65,3 +65,10 @@ Package.resolved
 scratch/
 tmp/
 *.log
+
+# ---------------------------------------------------------------------------
+# Local inventory output. Names every project and every credential on this
+# machine. No values, but still reconnaissance data, and this repo is public.
+# Regenerate with tools/inventory/collect.sh; the tools are the durable part.
+# ---------------------------------------------------------------------------
+catalog/
