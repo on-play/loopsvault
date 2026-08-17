@@ -10,11 +10,7 @@
 //! opt-in MITM transport lands later and will call the same
 //! `loopsvault_core::inject::decide`, never its own copy.
 
-mod config;
-mod proxy;
-mod routes;
-mod state;
-mod store;
+use loopsvaultd::{config, routes, state};
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
