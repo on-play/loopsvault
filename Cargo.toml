@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/loopsvault-core",
+    "crates/loopsvaultd",
 ]
 
 [workspace.package]
