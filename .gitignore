@@ -72,3 +72,4 @@ tmp/
 # Regenerate with tools/inventory/collect.sh; the tools are the durable part.
 # ---------------------------------------------------------------------------
 catalog/
+/target
