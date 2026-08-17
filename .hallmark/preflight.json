@@ -1,0 +1,17 @@
+{
+  "scanned_at": "2026-08-17",
+  "framework": "static HTML addition to a Rust workspace",
+  "font_stack": "none found",
+  "palette": "none found",
+  "motion": "motion-cut, no web motion library found",
+  "spacing": "none found",
+  "preserve": [
+    "Rust daemon and CLI implementation",
+    "existing documentation and project scope"
+  ],
+  "introduce": [
+    "portable brand tokens",
+    "static landing page",
+    "SVG logo system"
+  ]
+}

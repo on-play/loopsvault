@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 48" role="img" aria-labelledby="title desc">
+  <title id="title">LoopsVault</title>
+  <desc id="desc">LoopsVault mark and monospace wordmark.</desc>
+  <g transform="translate(2 2) scale(.9167)" color="#000000">
+    <path d="M24 5h9c5.523 0 10 4.477 10 10v18c0 5.523-4.477 10-10 10H15C9.477 43 5 38.523 5 33V15C5 9.477 9.477 5 15 5h3" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square"/>
+    <path d="M29 14h2.5a3.5 3.5 0 0 1 3.5 3.5v13a3.5 3.5 0 0 1-3.5 3.5H16.5a3.5 3.5 0 0 1-3.5-3.5v-13a3.5 3.5 0 0 1 3.5-3.5H19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"/>
+    <rect x="21" y="21" width="6" height="6" rx="1" fill="#124EC5"/>
+  </g>
+  <text x="58" y="31" fill="#000000" font-family="ui-monospace, SFMono-Regular, Cascadia Code, Roboto Mono, monospace" font-size="23" font-weight="650" letter-spacing="-0.8">LoopsVault</text>
+</svg>

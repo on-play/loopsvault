@@ -1,5 +1,7 @@
 # LoopsVault
 
+**[Landing page](website/index.html) · [Brand system](design.md)**
+
 A local, encrypted vault that lets AI coding agents **use** API keys without ever **seeing** them,
 while giving them a plaintext catalog of what exists and what it is for.
 
