@@ -594,3 +594,84 @@ async fn paths_headers_and_response_bytes_pass_through_untouched() {
         "a nested field the meter does not model must still reach the caller"
     );
 }
+
+/// Settles the question 42flows.com asked directly: when a request arrives
+/// carrying BOTH a project token AND its own `Authorization` header, what does
+/// the upstream actually receive?
+///
+/// Their three call sites all set `Authorization: Bearer ${config.openrouterApiKey}`
+/// themselves. Two failure shapes were plausible from reading the strip list:
+/// the caller's header is forwarded and the injected credential never applies,
+/// or both are emitted and the provider 401s on a duplicate.
+///
+/// Neither happens. The header named by the placement is dropped from the
+/// inbound request before anything is forwarded, then written fresh. So exactly
+/// one arrives and it is always the real credential.
+///
+/// The `Bearer undefined` case is the same path and matters for adoption: once
+/// a project blanks its own key, that is the literal string its client will
+/// send, and it must not reach the provider.
+#[tokio::test]
+async fn a_callers_own_authorization_is_replaced_not_duplicated() {
+    for caller_sends in [
+        "Bearer sk-or-v1-the-callers-own-stale-key",
+        "Bearer undefined",
+        "Bearer ",
+        "Basic Zm9vOmJhcg==",
+    ] {
+        let h = Harness::new("dupeauth");
+
+        let count: Arc<Mutex<(usize, Option<String>)>> = Arc::new(Mutex::new((0, None)));
+        let rec = count.clone();
+        let upstream = Router::new().route(
+            "/v1/chat/completions",
+            post(move |headers: HeaderMap| {
+                let rec = rec.clone();
+                async move {
+                    let mut s = rec.lock().unwrap();
+                    // get_all counts every value under the name, so a duplicate
+                    // would show up here rather than being silently collapsed.
+                    s.0 = headers.get_all("authorization").iter().count();
+                    s.1 = headers
+                        .get("authorization")
+                        .and_then(|v| v.to_str().ok())
+                        .map(String::from);
+                    axum::Json(serde_json::json!({"model":"m","usage":{"prompt_tokens":1,"completion_tokens":1}}))
+                }
+            }),
+        );
+        let upstream_addr = spawn(upstream).await;
+
+        let (state, token) = build_state(
+            &h,
+            &format!("http://{upstream_addr}"),
+            "127.0.0.1",
+            vec!["pitchplus_fast".into()],
+        );
+        let addr = spawn(loopsvaultd::routes::router(state)).await;
+
+        reqwest::Client::new()
+            .post(format!("http://{addr}/openrouter/v1/chat/completions"))
+            .header("x-loopsvault-project-token", &token)
+            .header("authorization", caller_sends)
+            .json(&serde_json::json!({"model":"m","messages":[]}))
+            .send()
+            .await
+            .unwrap();
+
+        let s = count.lock().unwrap();
+        assert_eq!(
+            s.0, 1,
+            "exactly one Authorization must reach upstream, caller sent {caller_sends:?}"
+        );
+        assert_eq!(
+            s.1.as_deref(),
+            Some(format!("Bearer {REAL_CREDENTIAL}").as_str()),
+            "the injected credential must win, caller sent {caller_sends:?}"
+        );
+        assert!(
+            !s.1.as_deref().unwrap_or("").contains("undefined"),
+            "a blanked client key must never reach the provider"
+        );
+    }
+}
