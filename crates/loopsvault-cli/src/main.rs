@@ -82,9 +82,23 @@ enum Command {
     /// Describe one entry, by canonical name or alias.
     Describe { name: String },
     /// Store a value. Read from stdin, never from an argument.
-    Set { name: String },
+    Set {
+        name: String,
+        /// Store under a name the catalog does not know. Almost always a typo,
+        /// so it has to be asked for.
+        #[arg(long)]
+        force: bool,
+    },
     /// Delete a value.
-    Rm { name: String },
+    Rm {
+        #[arg(default_value = "")]
+        name: String,
+        /// Delete every stored value no catalog entry answers to, without
+        /// having to name it. Naming it is the thing to avoid when the name is
+        /// itself a credential.
+        #[arg(long)]
+        orphans: bool,
+    },
     /// Per-project usage and cost.
     Usage,
     /// Write an encrypted break-glass export.
@@ -129,8 +143,8 @@ fn main() -> anyhow::Result<()> {
             remote_get(&cli.daemon, &format!("/catalog/{name}"), render_entry)
         }
         Command::Usage => remote_get(&cli.daemon, "/usage", render_usage),
-        Command::Set { name } => set(&config_path, &name),
-        Command::Rm { name } => rm(&config_path, &name),
+        Command::Set { name, force } => set(&config_path, &name, force),
+        Command::Rm { name, orphans } => rm(&config_path, &name, orphans),
         Command::Export { out } => export(&config_path, &out),
         Command::Project(cmd) => project(&config_path, cmd),
     }
@@ -415,8 +429,61 @@ fn read_secret(prompt: &str, take_all: bool) -> anyhow::Result<String> {
     Ok(buf)
 }
 
-fn set(config_path: &PathBuf, name: &str) -> anyhow::Result<()> {
-    let (_cfg, mut store) = open_store(config_path)?;
+fn set(config_path: &PathBuf, name: &str, force: bool) -> anyhow::Result<()> {
+    let (cfg, mut store) = open_store(config_path)?;
+
+    // A value stored under a name no catalog entry answers to is invisible
+    // forever: nothing looks it up, and `ls` goes on reporting the real
+    // credential as missing. `set` used to accept any string and report
+    // success, so a single typo produced a silent no-op that looked like a
+    // working command. Refuse instead, and say what was probably meant.
+    // A variable NAME is an identifier. A value is not. Checked BEFORE the
+    // catalog lookup and NOT overridable by --force, because the failure this
+    // catches is not a typo, it is the key itself arriving in the name
+    // position, which happened on 2026-08-19 and put a live credential into a
+    // catalog name, an unauthenticated HTTP response and an agent's context.
+    //
+    // The name comes from argv, and argv is visible to every process through
+    // `ps` and lands in shell history. That is exactly why the VALUE is read
+    // from stdin, and it is why a value must never be accepted here.
+    if !name.chars().next().map(|c| c.is_ascii_alphabetic() || c == '_').unwrap_or(false)
+        || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        bail!(
+            "{} is not a variable name.\n\n\
+             A name is an identifier: letters, digits and underscores, starting with a letter \
+             or underscore. What you passed looks like a VALUE.\n\n\
+             If you pasted a credential here, it went into argv, which means it is in your \
+             shell history and was visible to every process on this machine. TREAT IT AS \
+             COMPROMISED AND ROTATE IT.\n\n\
+             The value is never passed as an argument. Run `loopsvault set <NAME>` and paste \
+             it at the prompt, or pipe it on stdin.",
+            if name.len() > 8 { format!("{}...({} chars)", &name[..4], name.len()) } else { name.to_string() }
+        );
+    }
+
+    if !force && cfg.catalog.get(name).is_err() {
+        let known = cfg.catalog.names();
+        let near: Vec<&str> = known
+            .iter()
+            .copied()
+            .filter(|k| {
+                k.eq_ignore_ascii_case(name)
+                    || k.to_ascii_uppercase().contains(&name.to_ascii_uppercase())
+                    || name.to_ascii_uppercase().contains(&k.to_ascii_uppercase())
+            })
+            .collect();
+
+        let mut msg = format!("no catalog entry answers to {name}, so a value stored under it would never be used.\n");
+        if !near.is_empty() {
+            msg.push_str(&format!("Did you mean: {}\n", near.join(", ")));
+        }
+        msg.push_str(&format!(
+            "Known names: {}\n\nAdd it to the catalog first, or pass --force if you really mean a name nothing references.",
+            if known.is_empty() { "(the catalog is empty)".to_string() } else { known.join(", ") }
+        ));
+        bail!("{msg}");
+    }
 
     let value = read_secret(&format!("Value for {name} (not echoed): "), true)?;
     let value = value.trim().to_string();
@@ -436,8 +503,33 @@ fn set(config_path: &PathBuf, name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn rm(config_path: &PathBuf, name: &str) -> anyhow::Result<()> {
-    let (_cfg, mut store) = open_store(config_path)?;
+fn rm(config_path: &PathBuf, name: &str, orphans: bool) -> anyhow::Result<()> {
+    let (cfg, mut store) = open_store(config_path)?;
+
+    if orphans {
+        let doomed: Vec<String> = store
+            .names()
+            .into_iter()
+            .filter(|n| cfg.catalog.get(n).is_err())
+            .map(String::from)
+            .collect();
+        if doomed.is_empty() {
+            println!("No unclaimed values. Nothing to do.");
+            return Ok(());
+        }
+        for d in &doomed {
+            store.remove(d)?;
+            let shown = if d.len() > 8 { format!("{}...({} chars)", &d[..4], d.len()) } else { d.clone() };
+            println!("Deleted {shown}.");
+        }
+        println!("\nIf any of those were a credential pasted into the name position, it \
+                  reached argv and your shell history. Rotate it.");
+        return Ok(());
+    }
+
+    if name.is_empty() {
+        bail!("give a name, or --orphans to clear everything unclaimed");
+    }
     if store.remove(name)? {
         println!("Deleted {name}.");
     } else {
@@ -587,6 +679,24 @@ fn render_catalog(v: &serde_json::Value) -> anyhow::Result<()> {
             if e["stored"].as_bool().unwrap_or(false) { "yes" } else { "NO" },
             e["comment"].as_str().unwrap_or("")
         );
+    }
+    if let Some(orphans) = v["orphaned"].as_array().filter(|a| !a.is_empty()) {
+        println!();
+        println!("STORED BUT UNCLAIMED, nothing will ever use these:");
+        for o in orphans {
+            // Redacted. An orphan is by definition a name nothing expected, and
+            // the way this goes wrong is a credential landing in the name
+            // position, so printing them in full turns a diagnostic into a leak.
+            let n = o.as_str().unwrap_or("");
+            if n.len() > 8 {
+                println!("  {}...({} chars)", &n[..4], n.len());
+            } else {
+                println!("  {n}");
+            }
+        }
+        println!("Each is a value stored under a name no catalog entry answers to,");
+        println!("almost always a typo. Add a catalog entry with that name, or");
+        println!("`loopsvault rm <name>` and store it again under the right one.");
     }
     println!();
     println!("Values are never shown. To use one, send your request through the daemon.");

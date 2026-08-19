@@ -60,12 +60,24 @@ async fn catalog(State(state): State<AppState>) -> Json<CatalogView> {
         })
         .collect();
 
+    // Stored names that no catalog entry claims. Without this a typo in
+    // `loopsvault set` is invisible: the value is stored under a name nothing
+    // will ever look up, `set` reports success, and the catalog goes on saying
+    // the credential is missing. Silent, and the two halves never meet.
+    let orphaned: Vec<String> = store
+        .names()
+        .into_iter()
+        .filter(|n| state.catalog.get(n).is_err())
+        .map(String::from)
+        .collect();
+
     Json(CatalogView {
         note: "Names, purposes and shapes only. Values are never served by this API, \
                and there is no endpoint that returns one. To USE a credential, send your \
                request through the proxy and it will be written in on the way out."
             .into(),
         entries,
+        orphaned,
     })
 }
 
@@ -162,6 +174,9 @@ async fn audit(State(state): State<AppState>) -> Json<serde_json::Value> {
 pub struct CatalogView {
     note: String,
     entries: Vec<EntryView>,
+    /// Values stored under a name no catalog entry answers to. Always a
+    /// mistake, and always worth showing loudly.
+    orphaned: Vec<String>,
 }
 
 #[derive(Serialize)]
