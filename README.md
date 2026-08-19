@@ -107,6 +107,13 @@ There is no `loopsvault get`. Once stored, this tool will not show you a value.
 - **The `_vaultd` service account is designed but not installed.** Today the store is protected by
   encryption at rest and by convention, not by the kernel. See
   [`founder/task-service-account.md`](founder/task-service-account.md).
+- **Streaming responses are buffered, not relayed.** The daemon collects the whole upstream
+  response before returning any of it. The request succeeds and the usage is metered correctly, so
+  nothing is broken, but a caller streaming tokens to a user receives them all at once at the end.
+  Worth stating loudly because the code around it implies otherwise: the meter carries SSE parsing
+  and injects `stream_options.include_usage`, which together read as full streaming support.
+  Asserted in `streaming_responses_are_buffered_not_relayed` so the limit is measured rather than
+  remembered.
 - The audit log is in memory, not durable.
 - No spend caps, no SwiftUI app, no Touch ID, no Secure Enclave. Those are v2, and the v1 code is
   shaped so they drop in: the master key unwrapper is a trait with a file implementation today and

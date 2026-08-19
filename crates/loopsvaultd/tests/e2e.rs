@@ -675,3 +675,108 @@ async fn a_callers_own_authorization_is_replaced_not_duplicated() {
         );
     }
 }
+
+/// An honest limit, asserted rather than left for someone to discover in
+/// production.
+///
+/// The daemon collects the whole upstream response before returning any of it.
+/// For the non-streaming JSON that v1's first adopter sends, that is harmless.
+/// For a streaming response it is not: the caller gets every chunk at once, at
+/// the end, so token-by-token delivery to a user is destroyed.
+///
+/// This is worth a test precisely because the code around it implies otherwise.
+/// The meter carries `parse_usage_sse` and `ensure_stream_usage`, which together
+/// read as "streaming is supported". It is supported in the sense that the
+/// request succeeds and the usage is metered correctly. It is not supported in
+/// the sense anyone building a chat UI means.
+///
+/// If this test ever fails, someone has made the proxy relay incrementally,
+/// which is the fix. Delete the assertion then, and the README limit with it.
+#[tokio::test]
+async fn streaming_responses_are_buffered_not_relayed() {
+    use futures_util::StreamExt;
+    use std::time::{Duration, Instant};
+
+    const GAP_MS: u64 = 400;
+    let h = Harness::new("buffering");
+
+    let upstream = Router::new().route(
+        "/v1/chat/completions",
+        post(|| async {
+            // Chunk one is ready immediately. Chunk two arrives GAP_MS later.
+            // A relaying proxy delivers chunk one straight away; a buffering one
+            // delivers nothing until chunk two has landed.
+            let s = futures_util::stream::unfold(0usize, |i| async move {
+                if i >= 2 {
+                    return None;
+                }
+                if i == 1 {
+                    tokio::time::sleep(Duration::from_millis(GAP_MS)).await;
+                }
+                let frame = if i == 0 {
+                    "data: {\"model\":\"m\",\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n".to_string()
+                } else {
+                    "data: {\"model\":\"m\",\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":2}}\n\ndata: [DONE]\n\n".to_string()
+                };
+                Some((
+                    Ok::<_, std::io::Error>(axum::body::Bytes::from(frame)),
+                    i + 1,
+                ))
+            });
+            axum::response::Response::builder()
+                .header("content-type", "text/event-stream")
+                .body(axum::body::Body::from_stream(s))
+                .unwrap()
+        }),
+    );
+    let upstream_addr = spawn(upstream).await;
+
+    let (state, token) = build_state(
+        &h,
+        &format!("http://{upstream_addr}"),
+        "127.0.0.1",
+        vec!["pitchplus_fast".into()],
+    );
+    let addr = spawn(loopsvaultd::routes::router(state)).await;
+
+    let started = Instant::now();
+    let resp = reqwest::Client::new()
+        .post(format!("http://{addr}/openrouter/v1/chat/completions"))
+        .header("x-loopsvault-project-token", &token)
+        .json(&serde_json::json!({"model":"m","stream":true,"messages":[]}))
+        .send()
+        .await
+        .unwrap();
+
+    let mut stream = resp.bytes_stream();
+    let _first = stream.next().await.expect("a first chunk").unwrap();
+    let ttfb = started.elapsed();
+
+    // The documented limit. Time to first byte should be ~0 for a relaying
+    // proxy and >= the gap for a buffering one.
+    assert!(
+        ttfb >= Duration::from_millis(GAP_MS),
+        "the proxy appears to relay incrementally now (ttfb {ttfb:?}). That is an \
+         improvement, not a failure: delete this assertion and the streaming limit \
+         in the README."
+    );
+
+    // And the request still SUCCEEDS and is metered. Buffered is not broken.
+    let rest: Vec<_> = stream.collect().await;
+    let mut whole = String::from_utf8_lossy(&_first).to_string();
+    for c in rest {
+        whole.push_str(&String::from_utf8_lossy(&c.unwrap()));
+    }
+    assert!(whole.contains("[DONE]"), "the full stream must still arrive");
+
+    let usage: serde_json::Value = reqwest::get(format!("http://{addr}/usage"))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        usage["projects"]["pitchplus_fast"]["input_tokens"], 5,
+        "usage must still be parsed out of the SSE frames: {usage}"
+    );
+}
