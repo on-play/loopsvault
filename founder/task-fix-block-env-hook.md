@@ -62,7 +62,7 @@ backed up to `~/.claude/scripts/block-env-access.sh.bak-20260817-134715`.
 **The line moved from the filename to the `=` sign.** Left of it (which files exist, which
 variables, how many, how long a value is) is inventory an agent needs. Right of it is the secret.
 
-- `bash tools/env-guard/test-guard.sh` - 95 assertions, both directions, all green.
+- `bash tools/env-guard/test-guard.sh` - 100 assertions, both directions, all green.
 - Live end-to-end: `find /Users/jain.jagi/Projects -maxdepth 3 -name ".env*" -type f` now runs
   through the real hook and returned 70 files. That is the exact command that was blocked during
   the design session.

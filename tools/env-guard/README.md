@@ -7,7 +7,7 @@ here is the source of truth; the installed copy is a build artifact.
 
 ```
 bash tools/env-guard/install.sh     # tests, backs up, installs, re-tests, rolls back on failure
-bash tools/env-guard/test-guard.sh  # 95 assertions, both directions
+bash tools/env-guard/test-guard.sh  # 100 assertions, both directions
 ```
 
 ## The line it draws
