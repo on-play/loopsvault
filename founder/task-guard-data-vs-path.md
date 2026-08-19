@@ -97,3 +97,60 @@ verification from a second session before it installs. It is not a quick follow-
 Neither has been built. The guard's source of truth is `tools/env-guard/` in this repo and the
 installed copy at `~/.claude/scripts/` is untouched. This is global config affecting every session
 on the machine, so it waits for you.
+
+
+---
+
+## Update 2026-08-19: a deeper finding that reorders this
+
+The jainyagi.com session went one level down and asked whether the guard can recognise that a word
+**is** a path at all. It cannot. The matcher is a literal string comparison over raw text, so the
+shell reassembles a name the guard never saw. Verified here against the real guard, decision-only,
+nothing run against a real file:
+
+```
+cat <str>                DENY   the plain spelling
+F=<str>; cat $F          ALLOW
+p=$HOME/<str>; head $p   ALLOW
+cat ."env"               ALLOW
+cat .e"n"v               ALLOW
+cat .en''v               ALLOW
+cat $'\x2eenv'           ALLOW
+cat "$(echo <str>)"      ALLOW
+cat .en\v                ALLOW   (found here, not on their list)
+```
+
+Every one of those reads the file if it runs.
+
+**Why 100 green assertions missed it.** All 84 check sites vary the VERB or the WRAPPER: cat,
+source, base64, xxd, `bash -c`, backticks, `find -exec`, xargs, while-read, interpreters, `\cat`,
+indirect `$CAT`. **Not one varies how the path is written.** The tell is a pair already in the
+suite: `echo $(cat <str>)` is tested, a substitution holding the READ. `cat "$(echo <str>)"` is not,
+a substitution holding the PATH. Same construct, opposite side of the command.
+
+**Severity, stated honestly.** This is a local guardrail against an agent pulling secrets into its
+own context, not an internet-facing control, and anyone with a shell has already won. Against an
+accidental read it still works, because an agent reaching for a file types the plain form and the
+plain form is denied. The case that matters is the middle one: an agent that hits the denial and
+helpfully **restructures** succeeds on its first attempt, and restructuring is exactly the behaviour
+this guard exists to stop. Right now the sentence "do not write a workaround script" is doing more
+work than the matcher is. It holds because agents comply, not because they are stopped.
+
+That is not a crisis, and it does not change what the guard is worth: it makes the right thing easy
+and the wrong thing visible. It does mean it is a guardrail and not a barrier, and the barrier is
+the kernel boundary in `task-service-account.md`, which is still not installed.
+
+**How this reorders the options.** It argues for conservatism, not against it. Operand detection
+presumes you can tell which word is the path, and today the guard cannot reliably tell a word is a
+path at all. Narrowing which words get inspected without fixing how a path is recognised narrows an
+already-porous check.
+
+Revised recommendation, and I agree with theirs:
+
+1. **Add the path axis to the suite**, whichever fix lands. The gap is in my test design.
+2. **Normalise quotes and `$'...'` escapes before matching.** A pre-step, not a policy change, so it
+   cannot widen what is allowed, only tighten. Closes 6 of the 9.
+3. **Leave variable tracking alone.** It chases a tail with no end. The honest answer is that string
+   matching has a ceiling and the kernel-level design is the way through it.
+
+Nothing built, nothing installed.
