@@ -99,6 +99,9 @@ enum Command {
         #[arg(long)]
         orphans: bool,
     },
+    /// Check that a stored credential actually works, against an endpoint that
+    /// genuinely requires authentication.
+    Verify { name: String },
     /// Per-project usage and cost.
     Usage,
     /// Write an encrypted break-glass export.
@@ -143,11 +146,99 @@ fn main() -> anyhow::Result<()> {
             remote_get(&cli.daemon, &format!("/catalog/{name}"), render_entry)
         }
         Command::Usage => remote_get(&cli.daemon, "/usage", render_usage),
+        Command::Verify { name } => verify(&config_path, &cli.daemon, &name),
         Command::Set { name, force } => set(&config_path, &name, force),
         Command::Rm { name, orphans } => rm(&config_path, &name, orphans),
         Command::Export { out } => export(&config_path, &out),
         Command::Project(cmd) => project(&config_path, cmd),
     }
+}
+
+/// Where a project's token lives. One file per project, 0600, so a token never
+/// has to be echoed to a terminal or pasted between processes to be used.
+fn token_path(project: &str) -> PathBuf {
+    expand_tilde("~/.loopsvault/tokens").join(format!("{project}.token"))
+}
+
+/// Prove a stored credential works.
+///
+/// The endpoint matters more than anything else here. On 2026-08-19 a 200 from
+/// OpenRouter's /models was reported as proof the vault had brokered a real
+/// credential. That endpoint is PUBLIC and returns 200 with no auth at all, so
+/// the check proved routing and proved nothing about the key, and the key was
+/// in fact dead. The provider table now carries a path that FAILS without a
+/// credential, which is the only kind of endpoint that can answer this.
+fn verify(config_path: &PathBuf, daemon: &str, name: &str) -> anyhow::Result<()> {
+    let cfg = Config::load(config_path)?;
+    let entry = cfg
+        .catalog
+        .get(name)
+        .map_err(|e| anyhow::anyhow!("{e}. Run `loopsvault ls` to see what exists."))?;
+
+    let profile = loopsvault_core::providers::profile_by_key(&entry.provider)
+        .ok_or_else(|| anyhow::anyhow!("no provider profile for {}", entry.provider))?;
+
+    if profile.verify_path.is_empty() {
+        bail!(
+            "{} has no verification endpoint in the provider table.\n\
+             Every endpoint this provider offers either costs money or does not require auth, \
+             so a check would be either expensive or meaningless. Left blank on purpose rather \
+             than pointed at something that always returns 200.",
+            entry.provider
+        );
+    }
+
+    let project = entry.projects.first().ok_or_else(|| {
+        anyhow::anyhow!("{name} permits no projects, so nothing can use it")
+    })?;
+    let tp = token_path(project);
+    let token = std::fs::read_to_string(&tp)
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "no token for {project} at {}. Run `loopsvault project add {project}`.",
+                tp.display()
+            )
+        })?
+        .trim()
+        .to_string();
+
+    let url = format!(
+        "{}/{}{}",
+        daemon.trim_end_matches('/'),
+        profile.key,
+        profile.verify_path
+    );
+    println!("Checking {name} against {}{}", profile.upstream, profile.verify_path);
+    println!("(an endpoint that fails without a credential, so a pass means something)\n");
+
+    let resp = reqwest::blocking::Client::new()
+        .get(&url)
+        .header("x-loopsvault-project-token", token)
+        .send()
+        .with_context(|| format!("asking the daemon at {daemon}. Is loopsvaultd running?"))?;
+
+    let status = resp.status();
+    let body = resp.text().unwrap_or_default();
+
+    if status.is_success() {
+        println!("PASS  the provider accepted the stored credential (HTTP {status}).");
+        return Ok(());
+    }
+
+    println!("FAIL  the provider rejected it (HTTP {status}).");
+    println!();
+    // The distinction that took a whole session to establish by hand.
+    if body.contains("loopsvault_denied") {
+        println!("The refusal came from the VAULT, not the provider. The request never reached");
+        println!("the credential. Read the next_step field below.");
+    } else {
+        println!("The refusal came from the PROVIDER, which means the credential WAS injected");
+        println!("and the provider does not recognise it. The stored value is wrong, revoked,");
+        println!("or belongs to a different account. Rotate at the provider and re-store it.");
+    }
+    println!();
+    println!("{}", body.chars().take(300).collect::<String>());
+    std::process::exit(1);
 }
 
 fn open_store(config_path: &PathBuf) -> anyhow::Result<(Config, CredentialStore)> {
@@ -579,11 +670,27 @@ fn project(config_path: &PathBuf, cmd: ProjectCmd) -> anyhow::Result<()> {
                 .issue(id)
                 .map_err(|e| anyhow::anyhow!("issuing a token: {e}"))?;
             save_config(config_path, &cfg)?;
-            println!("{}", token.expose());
+            // Written, not printed. A token echoed to a terminal lands in
+            // scrollback and in the context of whatever agent is watching, and
+            // moving it from there to a config file means it passes through
+            // both. A path can be handed around; a value should not have to be.
+            let tp = token_path(&name);
+            if let Some(d) = tp.parent() {
+                std::fs::create_dir_all(d)?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(d, std::fs::Permissions::from_mode(0o700));
+                }
+            }
+            write_private(&tp, token.expose().as_bytes())?;
+            println!("{}", tp.display());
             eprintln!();
-            eprintln!("Shown once. The daemon stores only a hash of it, so it cannot be");
-            eprintln!("printed again. Put it in {name}'s environment as");
-            eprintln!("LOOPSVAULT_PROJECT_TOKEN and send it in the");
+            eprintln!("Written there, mode 0600, not printed. The daemon stores only a hash,");
+            eprintln!("so it cannot be recovered later.");
+            eprintln!();
+            eprintln!("Read the value from that file when you need it. Put it in {name}'s");
+            eprintln!("environment as LOOPSVAULT_PROJECT_TOKEN and send it in the");
             eprintln!("x-loopsvault-project-token header.");
             eprintln!();
             eprintln!("If you lose it, run this again; the old one stops working.");

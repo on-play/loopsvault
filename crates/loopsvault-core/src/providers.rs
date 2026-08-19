@@ -43,6 +43,15 @@ pub struct ProviderProfile {
     pub scheme: Option<&'static str>,
     /// Variable names that mean this credential. First is canonical.
     pub names: &'static [&'static str],
+    /// A path that REQUIRES auth and costs nothing, used to check whether a
+    /// stored credential actually works.
+    ///
+    /// Choosing this badly is how a green light becomes meaningless. On
+    /// 2026-08-19 a 200 from OpenRouter's /models was reported as proof that
+    /// the vault had brokered a real credential. /models is PUBLIC: it returns
+    /// 200 with no auth at all, so it proved routing and proved nothing about
+    /// the key. An endpoint belongs here only if it fails without a credential.
+    pub verify_path: &'static str,
     pub confidence: Confidence,
     /// Whether the response body carries token counts. False means the meter
     /// can count calls but not dollars, which the report shows honestly rather
@@ -79,6 +88,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "authorization",
         scheme: Some("Bearer"),
         names: &["OPENROUTER_API_KEY"],
+        verify_path: "/api/v1/auth/key",
         confidence: Confidence::Verified,
         reports_tokens: true,
         note: "OpenAI-compatible. Present in 7 projects, the widest sharing in the inventory.",
@@ -90,6 +100,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "authorization",
         scheme: Some("Bearer"),
         names: &["OPENAI_API_KEY"],
+        verify_path: "/v1/models",
         confidence: Confidence::Verified,
         reports_tokens: true,
         note: "Streaming needs stream_options.include_usage, which the daemon adds outbound.",
@@ -102,6 +113,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "x-api-key",
         scheme: None,
         names: &["ANTHROPIC_API_KEY", "CLAUDE_API_KEY"],
+        verify_path: "/v1/models",
         confidence: Confidence::Verified,
         reports_tokens: true,
         note: "One credential, two names in this inventory: ANTHROPIC_API_KEY in 6 projects and \
@@ -114,6 +126,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "x-goog-api-key",
         scheme: None,
         names: &["GEMINI_API_KEY"],
+        verify_path: "/v1beta/models",
         confidence: Confidence::Verified,
         reports_tokens: true,
         note: "Also accepts ?key=, but the header is preferred: a query string lands in the \
@@ -126,6 +139,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "authorization",
         scheme: Some("Bearer"),
         names: &["STRIPE_SECRET_KEY"],
+        verify_path: "/v1/balance",
         confidence: Confidence::Verified,
         reports_tokens: false,
         note: "Not an LLM API, so calls are counted and never priced. Brokering it still buys \
@@ -138,6 +152,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "authorization",
         scheme: Some("Bearer"),
         names: &["RESEND_API_KEY"],
+        verify_path: "/domains",
         confidence: Confidence::Verified,
         reports_tokens: false,
         note: "In 5 projects.",
@@ -149,6 +164,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "authorization",
         scheme: Some("Bearer"),
         names: &["REPLICATE_API_TOKEN"],
+        verify_path: "/v1/account",
         confidence: Confidence::Likely,
         reports_tokens: false,
         note: "Historically used the Token scheme and moved to Bearer. Confirm against a real \
@@ -161,6 +177,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "authorization",
         scheme: Some("Key"),
         names: &["FAL_KEY"],
+        verify_path: "",
         confidence: Confidence::Likely,
         reports_tokens: false,
         note: "Believed to use the Key scheme rather than Bearer. CONFIRM before relying on it. \
@@ -174,6 +191,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "xi-api-key",
         scheme: None,
         names: &["ELEVENLABS_API_KEY"],
+        verify_path: "/v1/user",
         confidence: Confidence::Likely,
         reports_tokens: false,
         note: "Confirm the header name against a real call.",
@@ -185,6 +203,7 @@ pub const PROFILES: &[ProviderProfile] = &[
         header: "authorization",
         scheme: Some("Token"),
         names: &["DEEPGRAM_API_KEY"],
+        verify_path: "/v1/projects",
         confidence: Confidence::Likely,
         reports_tokens: false,
         note: "Believed to use the Token scheme rather than Bearer. Confirm before relying on it.",
