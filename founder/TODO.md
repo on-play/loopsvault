@@ -12,6 +12,12 @@ marked.
 
 ## Needs you
 
+- [task-first-real-call.md](task-first-real-call.md) — **START HERE. Everything is staged and
+  blocked on one command from you: pasting the OpenRouter key.** v1 has worked since 2026-08-17 and
+  has still never brokered a real credential. The file carries the full two-step plan agreed with
+  the 42flows session, including the two traps that would each have produced a passing test proving
+  the opposite of what it claimed.
+
 - [task-service-account.md](task-service-account.md) — **The one part of v1's security story that is
   designed but not installed.** Until `_vaultd` exists, the store is protected by encryption at rest
   and by convention, not by the kernel, which means an agent running as you is stopped by nothing but
