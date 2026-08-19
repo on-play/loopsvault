@@ -140,8 +140,46 @@ strip_heredocs() {
 # because it holds placeholders and is meant to be read.
 references_env() {
   local s
-  s=$(echo "$1" | sed -E 's/(^|[^a-zA-Z0-9_])\.env\.example([^a-zA-Z0-9_]|$)/\1__ENV_EXAMPLE_OK__\2/g')
+  s=$(normalise_spelling "$1")
+  s=$(echo "$s" | sed -E 's/(^|[^a-zA-Z0-9_])\.env\.example([^a-zA-Z0-9_]|$)/\1__ENV_EXAMPLE_OK__\2/g')
   echo "$s" | grep -qE "$ENV_BASH_RE"
+}
+
+# Collapse the spellings the shell resolves but a literal match does not.
+#
+# bash concatenates ."env", .e"n"v, .en''v and .en\v into the real name long
+# after this guard has looked at the text. The guard sees a spelling; the kernel
+# opens the file. Found by the jainyagi.com session on 2026-08-19, reproduced
+# here, and every one of those forms reads the file if it runs.
+#
+# Runs ONLY on the copy used to decide whether a path is referenced, never on
+# the copy used to identify verbs. Stripping quotes from a command would merge
+# separate words and produce exactly the misattributed denial this guard is
+# already criticised for.
+#
+# It can only make MORE text match, so it tightens and cannot widen. That is why
+# it needs no both-directions redesign, unlike an operand-aware rule would.
+#
+# Deliberately NOT closed, and recorded in founder/task-guard-data-vs-path.md
+# rather than half-attempted: a path held in a variable (F=<name>; cat $F) and
+# one produced by a substitution (cat "$(echo <name>)"). Both need the guard to
+# track values through the shell, which is a tail with no end. String matching
+# has a ceiling; the kernel boundary in task-service-account.md is the way past
+# it.
+normalise_spelling() {
+  local s="$1"
+  case "$s" in
+    *'\x'*)
+      # Hex escapes, decoded before the quotes go. Only the characters that
+      # spell the guarded names, so this stays a targeted collapse rather than a
+      # general unescaper.
+      s=$(printf '%s' "$s" | sed -E 's/\\x2[eE]/./g; s/\\x65/e/g; s/\\x6[eE]/n/g; s/\\x76/v/g; s/\\x72/r/g; s/\\x63/c/g')
+      ;;
+  esac
+  s="${s//\"/}"
+  s="${s//\'/}"
+  s="${s//\\/}"
+  printf '%s' "$s"
 }
 
 # The verb of a single segment: skip VAR=value prefixes, skip bare backslashes
@@ -303,8 +341,10 @@ $(next_step_hint)"
     command=$(echo "$input" | jq -r '.tool_input.command // empty')
     # Heredoc bodies are data. Drop them before anything is classified.
     command=$(strip_heredocs "$command")
-    # Strip .env.example references, then check whether any other env reference remains
-    stripped=$(echo "$command" | sed -E 's/(^|[^a-zA-Z0-9_])\.env\.example([^a-zA-Z0-9_]|$)/\1__ENV_EXAMPLE_OK__\2/g')
+    # Normalise the spelling first, or a quoted form never reaches the per-stage
+    # logic below at all. Then neutralise the example file, then look.
+    stripped=$(normalise_spelling "$command")
+    stripped=$(echo "$stripped" | sed -E 's/(^|[^a-zA-Z0-9_])\.env\.example([^a-zA-Z0-9_]|$)/\1__ENV_EXAMPLE_OK__\2/g')
     if echo "$stripped" | grep -qE "$ENV_BASH_RE"; then
       # The command touches a real env path. Two ways it can do harm: a verb
       # that prints the contents, or a redirect that overwrites the file.

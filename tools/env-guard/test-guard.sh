@@ -178,6 +178,37 @@ check 'Grep in .env'                             DENY "$(run_grep /p/.env '')"
 check 'Grep glob .env*'                          DENY "$(run_grep '' '.env*')"
 
 echo
+echo "=== THE PATH AXIS: how the name is SPELLED, not which verb reads it ==="
+# Every deny case above varies the VERB or the WRAPPER. Not one varied how the
+# path itself is written, which is a blind spot with a shape rather than an
+# oversight: the tell was already here, since a substitution holding the READ
+# was tested and a substitution holding the PATH was not.
+#
+# bash concatenates these into the real name long after the guard has looked, so
+# each one reads the file if it runs.
+check 'cat ."env"          [quote-split]'       DENY "$(run_bash 'cat ."env"')"
+check 'cat .e"n"v          [quote-split]'       DENY "$(run_bash 'cat .e"n"v')"
+check "cat .en''v          [empty quotes]"      DENY "$(run_bash "cat .en''v")"
+check 'cat .en\v           [escaped]'           DENY "$(run_bash 'cat .en\v')"
+check "cat \$'\\x2eenv'      [hex escape]"      DENY "$(run_bash "cat \$'\\x2eenv'")"
+check 'head -2 ."env"'                          DENY "$(run_bash 'head -2 ."env"')"
+check 'source .en"v"'                           DENY "$(run_bash 'source .en"v"')"
+# Normalising must not cost any of the discovery the guard exists to allow.
+check 'ls -la .env* still allowed'              ALLOW "$(run_bash 'ls -la .env*')"
+check 'find piped to head still allowed'        ALLOW "$(run_bash 'find . -name ".env*" | head -60')"
+check '.env.example still readable'             ALLOW "$(run_bash 'cat .env.example')"
+
+echo
+echo "=== KNOWN OPEN, recorded not fixed (informational, not scored) ==="
+# A path held in a variable or produced by a substitution still passes. Closing
+# these needs the guard to track values through the shell, which is a tail with
+# no end. String matching has a ceiling; the kernel boundary is the way past it.
+# Printed so the gap stays visible instead of being quietly forgotten.
+for c in 'F=.env; cat $F' 'cat "$(echo .env)"'; do
+  printf '  open  %-6s %s\n' "$(run_bash "$c")" "$c"
+done
+
+echo
 echo "=== Denial messages must name the next step ==="
 msg=$(jq -nc '{tool_name:"Bash", tool_input:{command:"cat .env"}}' | bash "$GUARD" | jq -r '.hookSpecificOutput.permissionDecisionReason')
 for needle in "env-keys.sh" "find ." "wc -l" ".env.example" "ask the founder"; do
