@@ -23,6 +23,12 @@ marked.
   The others are the 133 ambiguous names needing your pass, and whether to normalise
   `ANTHROPIC_API_KEY` vs `CLAUDE_API_KEY` rather than carry aliases forever.
 
+- [task-guard-data-vs-path.md](task-guard-data-vs-path.md) — **The guard cannot tell a data
+  argument from a path.** Found by the jainyagi.com session, reproduced in three sessions across two
+  projects, verified here. It denies commands that cannot disclose anything, and when the string
+  arrives inside quoted JSON it blames a verb that never ran. Two options in the file; the safe half
+  is ready to build on your word. Global config, so it waits for you.
+
 - [task-guard-covers-process-env.md](task-guard-covers-process-env.md) — The env guard covers files
   but has never covered `printenv`, `echo $VAR`, or bare `env`, because none of those contain the
   string the guard triggers on. Closing it changes what is **denied**, so it is a decision rather
