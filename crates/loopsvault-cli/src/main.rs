@@ -754,6 +754,16 @@ fn render_usage(v: &serde_json::Value) -> anyhow::Result<()> {
             u["output_tokens"].as_u64().unwrap_or(0),
             micro as f64 / 1_000_000.0
         );
+        let samples = u["overhead_samples"].as_u64().unwrap_or(0);
+        if samples > 0 {
+            println!(
+                "{:<24} vault overhead: {}ms mean, {}ms worst, over {} calls (provider latency excluded)",
+                "",
+                u["overhead_ms_total"].as_u64().unwrap_or(0) / samples,
+                u["overhead_ms_max"].as_u64().unwrap_or(0),
+                samples
+            );
+        }
         let unpriced = u["unpriced_calls"].as_u64().unwrap_or(0);
         let unmetered = u["unmetered_calls"].as_u64().unwrap_or(0);
         if unpriced > 0 || unmetered > 0 {

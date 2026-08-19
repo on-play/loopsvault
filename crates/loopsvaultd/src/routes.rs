@@ -152,6 +152,16 @@ async fn usage(State(state): State<AppState>) -> Json<serde_json::Value> {
             Some(loopsvault_core::Attribution::Counted { .. }) => e.unmetered_calls += 1,
             None => {}
         }
+        // The daemon's own cost, with the provider's latency subtracted rather
+        // than averaged against. Comparing a proxied call to a direct one folds
+        // provider jitter into the delta and needs repetition to partly cancel
+        // it; subtracting the upstream leg cancels it exactly, per call, and
+        // needs nobody to hold a raw key to produce a baseline.
+        if let Some(o) = r.overhead_ms() {
+            e.overhead_ms_total += o;
+            e.overhead_ms_max = e.overhead_ms_max.max(o);
+            e.overhead_samples += 1;
+        }
     }
 
     Json(serde_json::json!({
@@ -207,4 +217,9 @@ struct ProjectUsage {
     micro_usd: u64,
     unpriced_calls: u64,
     unmetered_calls: u64,
+    /// Milliseconds this daemon added, summed, excluding the provider's own
+    /// latency.
+    overhead_ms_total: u64,
+    overhead_ms_max: u64,
+    overhead_samples: u64,
 }

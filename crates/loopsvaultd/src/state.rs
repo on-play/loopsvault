@@ -78,6 +78,32 @@ pub struct AuditRecord {
     pub alarm: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attribution: Option<loopsvault_core::Attribution>,
+    /// Milliseconds spent waiting on the provider, measured around the upstream
+    /// request only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upstream_ms: Option<u64>,
+    /// Milliseconds for the whole handler, from arrival to response ready.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_ms: Option<u64>,
+}
+
+impl AuditRecord {
+    /// What this daemon actually cost, with the provider's own latency removed.
+    ///
+    /// This is the honest instrument for "how much does the vault slow things
+    /// down". Comparing a proxied call against a direct one folds the
+    /// provider's jitter into the delta and needs repetition and alternation to
+    /// partly cancel it. Subtracting the upstream leg from the total cancels it
+    /// exactly, per call, and needs nobody to hold a raw key in order to
+    /// produce a baseline. That last part matters: measuring the direct path
+    /// means calling the provider with the credential in hand, which is the
+    /// thing this project exists to stop.
+    pub fn overhead_ms(&self) -> Option<u64> {
+        match (self.total_ms, self.upstream_ms) {
+            (Some(t), Some(u)) => Some(t.saturating_sub(u)),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]

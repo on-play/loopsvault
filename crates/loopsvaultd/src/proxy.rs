@@ -92,6 +92,7 @@ async fn proxy(
     rest: String,
     req: Request,
 ) -> Result<Response, ProxyError> {
+    let handler_started = std::time::Instant::now();
     // 1. Who is asking? Established by the token, never by a name the caller
     //    supplied. This is the property per-project attribution and spend caps
     //    depend on.
@@ -174,6 +175,8 @@ async fn proxy(
                 outcome: Outcome::Denied,
                 alarm,
                 attribution: None,
+                upstream_ms: None,
+                total_ms: Some(handler_started.elapsed().as_millis() as u64),
             });
             return Err(denial_to_error(&d));
         }
@@ -278,7 +281,9 @@ async fn proxy(
         }
     }
 
-    // 6. Forward.
+    // 6. Forward. Timed on its own so the provider's latency can be subtracted
+    //    from the total, giving this daemon's overhead directly.
+    let upstream_started = std::time::Instant::now();
     let upstream_resp = state
         .http
         .request(method, &url_with_key)
@@ -298,6 +303,8 @@ async fn proxy(
                 outcome: Outcome::UpstreamError,
                 alarm: false,
                 attribution: None,
+                upstream_ms: Some(upstream_started.elapsed().as_millis() as u64),
+                total_ms: Some(handler_started.elapsed().as_millis() as u64),
             });
             return Err(deny(
                 StatusCode::BAD_GATEWAY,
@@ -322,6 +329,10 @@ async fn proxy(
         )
     })?;
 
+    // The upstream leg ends once its body is fully read, since the daemon
+    // buffers rather than relays and the caller waits for all of it either way.
+    let upstream_ms = upstream_started.elapsed().as_millis() as u64;
+
     // 7. Meter it. The proxy is the only component that sees the project
     //    identity and the response body at the same time, which is what makes
     //    one key per provider viable.
@@ -336,6 +347,8 @@ async fn proxy(
         outcome: Outcome::Injected,
         alarm: false,
         attribution: Some(attribution),
+        upstream_ms: Some(upstream_ms),
+        total_ms: Some(handler_started.elapsed().as_millis() as u64),
     });
 
     let mut out = Response::builder().status(status);
