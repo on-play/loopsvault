@@ -780,3 +780,74 @@ async fn streaming_responses_are_buffered_not_relayed() {
         "usage must still be parsed out of the SSE frames: {usage}"
     );
 }
+
+/// The daemon must notice a credential stored while it is running.
+///
+/// It used to load the store once at startup and never look again, so
+/// `loopsvault set` against a running daemon had no effect and nothing said so.
+/// That cost most of an adoption session on 2026-08-19: the CLI reported the
+/// credential stored, the daemon went on reporting it missing, and both were
+/// telling the truth about different snapshots. The visible symptom pointed at
+/// the wrong cause entirely.
+#[tokio::test]
+async fn a_credential_stored_while_running_is_picked_up_without_a_restart() {
+    let h = Harness::new("reload");
+    let (state, _token) = build_state(
+        &h,
+        "http://127.0.0.1:9",
+        "127.0.0.1",
+        vec!["pitchplus_fast".into()],
+    );
+    let addr = spawn(loopsvaultd::routes::router(state)).await;
+
+    let stored = |body: &str| -> bool {
+        let v: serde_json::Value = serde_json::from_str(body).unwrap();
+        v["entries"][0]["stored"].as_bool().unwrap_or(false)
+    };
+
+    // build_state stores OPENROUTER_API_KEY, so start by removing it to get a
+    // daemon whose loaded snapshot genuinely lacks the value.
+    {
+        let mut s = CredentialStore::open(
+            h.dir.join("vault.store"),
+            &FileUnwrapper::new(h.dir.join("master.key")),
+        )
+        .unwrap();
+        s.remove("OPENROUTER_API_KEY").unwrap();
+    }
+    // Filesystem mtime granularity is coarse enough that two writes in the same
+    // instant can compare equal, which would make this pass for the wrong
+    // reason.
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+    let before = reqwest::get(format!("http://{addr}/catalog"))
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(!stored(&before), "precondition: the value should be absent");
+
+    // Now write it, exactly as the CLI would, with the daemon still running.
+    {
+        let mut s = CredentialStore::open(
+            h.dir.join("vault.store"),
+            &FileUnwrapper::new(h.dir.join("master.key")),
+        )
+        .unwrap();
+        s.put("OPENROUTER_API_KEY", SecretValue::new(REAL_CREDENTIAL))
+            .unwrap();
+    }
+
+    let after = reqwest::get(format!("http://{addr}/catalog"))
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(
+        stored(&after),
+        "the daemon must see a credential stored while it was running: {after}"
+    );
+    assert!(!after.contains(REAL_CREDENTIAL), "and still never serve it");
+}

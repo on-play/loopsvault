@@ -229,7 +229,8 @@ async fn proxy(
     // 5. Write the real credential in. This is the only place a value is read,
     //    and it is read at the moment it goes on the wire.
     {
-        let store = state.store.lock().unwrap();
+        let mut store = state.store.lock().unwrap();
+        store.reload_if_changed();
         let value = store.get(&injection.entry.name).ok_or_else(|| {
             deny(
                 StatusCode::FAILED_DEPENDENCY,

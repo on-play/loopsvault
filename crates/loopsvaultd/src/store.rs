@@ -53,6 +53,13 @@ pub struct CredentialStore {
     master: SecretValue,
     unwrapper_id: String,
     values: BTreeMap<String, SecretValue>,
+    /// Modification time of the file this was loaded from, so a change made by
+    /// the CLI while the daemon runs can be noticed. See `reload_if_changed`.
+    loaded_mtime: Option<std::time::SystemTime>,
+}
+
+fn mtime_of(path: &Path) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path).ok().and_then(|m| m.modified().ok())
 }
 
 /// Written by hand rather than derived. A derived `Debug` here would print the
@@ -86,6 +93,7 @@ impl CredentialStore {
                 master,
                 unwrapper_id: unwrapper.id().to_string(),
                 values: BTreeMap::new(),
+                loaded_mtime: None,
             });
         }
 
@@ -112,12 +120,57 @@ impl CredentialStore {
             .map(|(k, v)| (k, SecretValue::new(v)))
             .collect();
 
+        let loaded_mtime = mtime_of(&path);
         Ok(CredentialStore {
             path,
             master,
             unwrapper_id: unwrapper.id().to_string(),
             values,
+            loaded_mtime,
         })
+    }
+
+    /// Re-read the store if the file changed under us.
+    ///
+    /// The daemon used to load once at startup and never look again, so
+    /// `loopsvault set` while it was running had no effect and nothing said so.
+    /// On 2026-08-19 that cost most of an adoption session: the CLI reported a
+    /// credential stored, the daemon went on reporting it missing, and both
+    /// were telling the truth about different snapshots.
+    ///
+    /// A stat per call is nothing. The decrypt only happens when the file
+    /// actually changed, which matters because the scrypt KDF is deliberately
+    /// slow and doing it per request would be a self-inflicted rate limit.
+    ///
+    /// A failure here is deliberately NOT fatal: a half-written store during
+    /// someone else's save must not take the daemon down mid-request. The old
+    /// values stay in use and the next call tries again.
+    pub fn reload_if_changed(&mut self) -> bool {
+        let current = mtime_of(&self.path);
+        if current == self.loaded_mtime {
+            return false;
+        }
+        let Ok(ciphertext) = std::fs::read(&self.path) else {
+            return false;
+        };
+        let Ok(plaintext) = decrypt(&ciphertext, &self.master) else {
+            tracing::warn!(
+                path = %self.path.display(),
+                "store changed but could not be decrypted; keeping the previous contents"
+            );
+            return false;
+        };
+        let Ok(parsed) = serde_json::from_slice::<StorePlaintext>(&plaintext) else {
+            return false;
+        };
+        self.values = parsed
+            .values
+            .into_iter()
+            .map(|(k, v)| (k, SecretValue::new(v)))
+            .collect();
+        self.loaded_mtime = current;
+        tracing::info!(entries = self.values.len(), "reloaded the credential store");
+        true
     }
 
     pub fn get(&self, name: &str) -> Option<&SecretValue> {

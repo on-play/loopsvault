@@ -40,7 +40,8 @@ async fn healthz() -> &'static str {
 /// Values are absent by construction rather than by filtering: `CatalogEntry`
 /// has no field that could hold one. See `loopsvault_core::catalog`.
 async fn catalog(State(state): State<AppState>) -> Json<CatalogView> {
-    let store = state.store.lock().unwrap();
+    let mut store = state.store.lock().unwrap();
+        store.reload_if_changed();
     let entries = state
         .catalog
         .entries
@@ -107,7 +108,8 @@ async fn describe(
         ));
     }
 
-    let store = state.store.lock().unwrap();
+    let mut store = state.store.lock().unwrap();
+        store.reload_if_changed();
     Ok(Json(EntryView {
         name: entry.name.clone(),
         aliases: entry.aliases.clone(),
