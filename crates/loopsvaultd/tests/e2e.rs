@@ -515,3 +515,82 @@ async fn streaming_requests_are_rewritten_to_report_usage() {
         "daemon should have added the usage flag: {body}"
     );
 }
+
+/// Written in response to a concrete adoption report from 42flows.com, which
+/// runs OpenRouter through `ofetch` against a base of `https://openrouter.ai/api/v1`
+/// and reads nested usage fields for cached-read cost accounting.
+///
+/// Three things had to be true for that project and none were covered:
+///
+/// 1. The proxy is **path-agnostic**. It forwards `{upstream}/{rest}`, so a base
+///    of `.../openrouter/api/v1` reaches `/api/v1/chat/completions` AND
+///    `/api/v1/models`. That second one matters: their pricing sync calls
+///    `GET /models`, and a proxy that only understood chat completions would
+///    silently break it.
+/// 2. `HTTP-Referer` and `X-Title` survive. OpenRouter uses them for app
+///    attribution, so dropping them would silently change their dashboard.
+/// 3. The response body is passed through **byte for byte**. They read
+///    `prompt_tokens_details.cached_tokens`, which the meter does not know
+///    about. Metering must observe, never normalise, or it breaks a downstream
+///    ledger it has never heard of.
+#[tokio::test]
+async fn paths_headers_and_response_bytes_pass_through_untouched() {
+    let h = Harness::new("passthrough");
+
+    let seen: Arc<Mutex<(Option<String>, Option<String>, Option<String>)>> =
+        Arc::new(Mutex::new((None, None, None)));
+
+    // A response with a nested usage field the meter does not model.
+    const UPSTREAM_BODY: &str = r#"{"model":"test-model","usage":{"prompt_tokens":100,"completion_tokens":20,"prompt_tokens_details":{"cached_tokens":64}},"data":[{"id":"m"}]}"#;
+
+    let recorder = seen.clone();
+    let upstream = Router::new().route(
+        "/api/v1/models",
+        axum::routing::get(move |headers: HeaderMap| {
+            let recorder = recorder.clone();
+            async move {
+                let mut s = recorder.lock().unwrap();
+                s.0 = Some("/api/v1/models".to_string());
+                s.1 = headers.get("http-referer").and_then(|v| v.to_str().ok()).map(String::from);
+                s.2 = headers.get("x-title").and_then(|v| v.to_str().ok()).map(String::from);
+                axum::response::Response::builder()
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(UPSTREAM_BODY))
+                    .unwrap()
+            }
+        }),
+    );
+    let upstream_addr = spawn(upstream).await;
+
+    let (state, token) = build_state(
+        &h,
+        &format!("http://{upstream_addr}"),
+        "127.0.0.1",
+        vec!["pitchplus_fast".into()],
+    );
+    let addr = spawn(loopsvaultd::routes::router(state)).await;
+
+    let resp = reqwest::Client::new()
+        // The shape a project actually uses: base URL carries /api/v1.
+        .get(format!("http://{addr}/openrouter/api/v1/models"))
+        .header("x-loopsvault-project-token", &token)
+        .header("http-referer", "https://42flows.com")
+        .header("x-title", "42flows")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 200);
+    let got = resp.text().await.unwrap();
+
+    let s = seen.lock().unwrap();
+    assert_eq!(s.0.as_deref(), Some("/api/v1/models"), "multi-segment path must survive");
+    assert_eq!(s.1.as_deref(), Some("https://42flows.com"), "HTTP-Referer must survive");
+    assert_eq!(s.2.as_deref(), Some("42flows"), "X-Title must survive");
+
+    assert_eq!(got, UPSTREAM_BODY, "response must be byte-identical, not normalised");
+    assert!(
+        got.contains("\"cached_tokens\":64"),
+        "a nested field the meter does not model must still reach the caller"
+    );
+}

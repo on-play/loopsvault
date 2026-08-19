@@ -25,6 +25,7 @@ pub mod host;
 pub mod inject;
 pub mod meter;
 pub mod project;
+pub mod providers;
 pub mod secret;
 pub mod unwrap;
 
@@ -33,4 +34,5 @@ pub use host::{Host, HostAllowlist, HostError};
 pub use inject::{decide, Denial, Injection, InjectionRequest};
 pub use meter::{attribute, Attribution, PriceTable, Usage};
 pub use project::{ProjectId, ProjectRegistry, ProjectToken};
+pub use providers::{profile_for, Confidence, ProviderProfile, PROFILES};
 pub use secret::{CharClass, SecretValue, Shape};

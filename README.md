@@ -67,10 +67,16 @@ loopsvaultd &                        # listens on 127.0.0.1:14322
 Then point the project at the vault instead of the provider:
 
 ```
-OPENROUTER_BASE_URL=http://127.0.0.1:14322/openrouter/v1
+OPENROUTER_BASE_URL=http://127.0.0.1:14322/openrouter/api/v1
 ```
 
 and send the project token in `x-loopsvault-project-token`.
+
+**The path after the provider key is the upstream path, verbatim.** The daemon forwards
+`{upstream}/{rest}`, so it never needs to know which endpoints a provider has. That is why the
+example carries `/api/v1`: OpenRouter's real base is `https://openrouter.ai/api/v1`, and dropping
+the `/api` would reach a path that does not exist. It also means `/models` and `/generation` work
+through the same provider entry as `/chat/completions`, with no extra config.
 
 What agents can do freely, with no token and no privilege:
 

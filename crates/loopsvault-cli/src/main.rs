@@ -61,6 +61,22 @@ struct Cli {
 enum Command {
     /// Create a config, a master key, and an empty store.
     Init,
+    /// Generate catalog entries from an inventory of your projects.
+    ///
+    /// Only ever ADDS. It will not touch an entry you already have, will not
+    /// touch project tokens, and cannot touch values, because an inventory
+    /// carries variable names and never contents.
+    Bootstrap {
+        /// TSV from `tools/inventory/collect.sh`.
+        #[arg(long, default_value = "catalog/inventory.tsv")]
+        inventory: PathBuf,
+        /// Only these providers, comma separated. Default is all recognised.
+        #[arg(long)]
+        only: Option<String>,
+        /// Show what would change and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// List the catalog. Names, purposes and shapes; never values.
     Ls,
     /// Describe one entry, by canonical name or alias.
@@ -103,6 +119,11 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Command::Init => init(&config_path),
+        Command::Bootstrap {
+            inventory,
+            only,
+            dry_run,
+        } => bootstrap(&config_path, &inventory, only.as_deref(), dry_run),
         Command::Ls => remote_get(&cli.daemon, "/catalog", render_catalog),
         Command::Describe { name } => {
             remote_get(&cli.daemon, &format!("/catalog/{name}"), render_entry)
@@ -171,6 +192,188 @@ fn init(config_path: &PathBuf) -> anyhow::Result<()> {
     println!("Run `loopsvault export <path>` once you have values in it, and keep");
     println!("that export somewhere other than this machine. Without it, a lost");
     println!("master key means rotating every credential across every project.");
+    Ok(())
+}
+
+/// Turn an inventory of every project into catalog entries.
+///
+/// The founder has 100 real secrets across 28 projects. Writing a catalog entry
+/// for each by hand is the friction that kills adoption before the daemon ever
+/// brokers a real call, so the provider knowledge lives in a table
+/// (`loopsvault_core::providers`) and the entries are generated from it.
+///
+/// Safety properties, because this writes to the file that governs credential
+/// routing:
+///
+/// - It only ADDS. An entry that already exists is left exactly as it is and
+///   reported as skipped, so a hand-tuned host list is never silently widened.
+/// - It never touches `projects` (the token registry), `store_path` or
+///   `master_key_path`.
+/// - It cannot leak a value, because an inventory holds names, lengths and
+///   character classes and never contents.
+fn bootstrap(
+    config_path: &PathBuf,
+    inventory: &PathBuf,
+    only: Option<&str>,
+    dry_run: bool,
+) -> anyhow::Result<()> {
+    use loopsvault_core::catalog::{CatalogEntry, Classification};
+    use loopsvault_core::providers::{profile_for, Confidence};
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let mut cfg = Config::load(config_path).with_context(|| {
+        format!(
+            "loading {}. Run `loopsvault init` first.",
+            config_path.display()
+        )
+    })?;
+
+    let raw = std::fs::read_to_string(inventory).with_context(|| {
+        format!(
+            "reading {}. Generate it with:\n  bash tools/inventory/collect.sh > {}",
+            inventory.display(),
+            inventory.display()
+        )
+    })?;
+
+    let wanted: Option<BTreeSet<&str>> = only.map(|s| s.split(',').map(|x| x.trim()).collect());
+
+    // canonical provider key -> projects that use it, under any of its names.
+    let mut usage: BTreeMap<&'static str, BTreeSet<String>> = BTreeMap::new();
+    let mut unrecognised: BTreeSet<String> = BTreeSet::new();
+
+    for line in raw.lines() {
+        let f: Vec<&str> = line.split('\t').collect();
+        if f.len() < 6 {
+            continue;
+        }
+        let (project, name, kind) = (f[0], f[2], f[5]);
+        // Example and template files document intended names but describe no
+        // real deployment, so they must not create a permission.
+        if kind != "real" {
+            continue;
+        }
+        match profile_for(name) {
+            Some(p) => {
+                if let Some(w) = &wanted {
+                    if !w.contains(p.key) {
+                        continue;
+                    }
+                }
+                usage.entry(p.key).or_default().insert(project.to_string());
+            }
+            None => {
+                unrecognised.insert(name.to_string());
+            }
+        }
+    }
+
+    if usage.is_empty() {
+        println!("Nothing recognised in {}.", inventory.display());
+        println!("Known providers: {}", loopsvault_core::PROFILES.iter().map(|p| p.key).collect::<Vec<_>>().join(", "));
+        return Ok(());
+    }
+
+    let mut added = Vec::new();
+    let mut skipped = Vec::new();
+    let mut needs_confirming = Vec::new();
+
+    for (key, projects) in &usage {
+        let p = loopsvault_core::providers::profile_by_key(key).expect("key came from the table");
+        let canonical = p.canonical_name();
+
+        if cfg.catalog.get(canonical).is_ok() {
+            skipped.push(format!("{canonical} (already in your catalog)"));
+            continue;
+        }
+
+        let confirm = p.confidence == Confidence::Likely;
+        let mut comment = format!(
+            "{}. Used by {} project{}: {}.",
+            p.note.trim_end_matches('.'),
+            projects.len(),
+            if projects.len() == 1 { "" } else { "s" },
+            projects.iter().cloned().collect::<Vec<_>>().join(", ")
+        );
+        if confirm {
+            // Carried in the comment, not just printed once, so it is still
+            // visible in `loopsvault describe` months from now.
+            comment.insert_str(
+                0,
+                "CONFIRM THE PLACEMENT BEFORE RELYING ON THIS. ",
+            );
+            needs_confirming.push(canonical.to_string());
+        }
+
+        cfg.catalog.entries.push(CatalogEntry {
+            name: canonical.to_string(),
+            aliases: p.aliases().iter().map(|s| s.to_string()).collect(),
+            provider: p.key.to_string(),
+            comment,
+            expiry: None,
+            projects: projects.iter().cloned().collect(),
+            shape: None,
+            classification: Classification::Secret,
+            hosts: p.hosts.iter().map(|s| s.to_string()).collect(),
+            placement: Some(p.placement()),
+            honeytoken: false,
+        });
+
+        cfg.providers.entry(p.key.to_string()).or_insert_with(|| {
+            loopsvaultd::config::ProviderConfig {
+                upstream: p.upstream.to_string(),
+                credential: canonical.to_string(),
+            }
+        });
+
+        added.push(format!(
+            "{canonical:<24} {} project{:<2} -> {}",
+            projects.len(),
+            if projects.len() == 1 { "" } else { "s" },
+            p.hosts.join(", ")
+        ));
+    }
+
+    // Validate before writing. A generated config that stops the daemon booting
+    // would be a worse outcome than not generating one.
+    cfg.validate().context("the generated config failed validation, nothing was written")?;
+
+    println!("Added {} entr{}:", added.len(), if added.len() == 1 { "y" } else { "ies" });
+    for a in &added {
+        println!("  {a}");
+    }
+    if !skipped.is_empty() {
+        println!("\nLeft alone:");
+        for s in &skipped {
+            println!("  {s}");
+        }
+    }
+    if !needs_confirming.is_empty() {
+        println!("\nConfirm these before relying on them:");
+        for n in &needs_confirming {
+            println!("  {n}  (its auth header shape is believed correct, not verified)");
+        }
+        println!("A wrong header earns a 401 from the provider, so this is confusing rather");
+        println!("than dangerous. The exact-host rule still holds either way.");
+    }
+    if !unrecognised.is_empty() {
+        println!(
+            "\n{} variable names had no provider profile and were left out.",
+            unrecognised.len()
+        );
+        println!("Most are decided constants rather than credentials. Add a profile in");
+        println!("crates/loopsvault-core/src/providers.rs for any that should be brokered.");
+    }
+
+    if dry_run {
+        println!("\nDry run. Nothing was written.");
+        return Ok(());
+    }
+
+    save_config(config_path, &cfg)?;
+    println!("\nWrote {}.", config_path.display());
+    println!("No values were read or written; an inventory carries names, not contents.");
+    println!("Next: `loopsvault set <NAME>` for each, then start the daemon.");
     Ok(())
 }
 
