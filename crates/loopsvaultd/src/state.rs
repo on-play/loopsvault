@@ -85,6 +85,13 @@ pub struct AuditRecord {
     /// Milliseconds for the whole handler, from arrival to response ready.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_ms: Option<u64>,
+    /// The status the PROVIDER returned. Distinct from what the caller got, and
+    /// the difference is the whole point: an injected request that comes back
+    /// 401 means the stored credential is wrong, while the caller may still see
+    /// a 200 carrying an error body. Without this the audit says "injected" for
+    /// both a working key and a dead one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upstream_status: Option<u16>,
 }
 
 impl AuditRecord {

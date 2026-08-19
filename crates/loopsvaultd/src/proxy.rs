@@ -177,6 +177,7 @@ async fn proxy(
                 attribution: None,
                 upstream_ms: None,
                 total_ms: Some(handler_started.elapsed().as_millis() as u64),
+                upstream_status: None,
             });
             return Err(denial_to_error(&d));
         }
@@ -305,6 +306,7 @@ async fn proxy(
                 attribution: None,
                 upstream_ms: Some(upstream_started.elapsed().as_millis() as u64),
                 total_ms: Some(handler_started.elapsed().as_millis() as u64),
+                upstream_status: None,
             });
             return Err(deny(
                 StatusCode::BAD_GATEWAY,
@@ -349,6 +351,7 @@ async fn proxy(
         attribution: Some(attribution),
         upstream_ms: Some(upstream_ms),
         total_ms: Some(handler_started.elapsed().as_millis() as u64),
+        upstream_status: Some(status.as_u16()),
     });
 
     let mut out = Response::builder().status(status);

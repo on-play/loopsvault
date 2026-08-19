@@ -199,6 +199,32 @@ check 'find piped to head still allowed'        ALLOW "$(run_bash 'find . -name 
 check '.env.example still readable'             ALLOW "$(run_bash 'cat .env.example')"
 
 echo
+echo "=== THE PATH AXIS APPLIES TO WRITES TOO, not just reads ==="
+# The normalisation above reached the gate and the per-stage verb rule, but the
+# redirect check was still reading the RAW command, so a split spelling passed
+# the gate and arrived there invisible. It then fell through the verb rule
+# because ls, find, wc, echo and printf are all legitimate discovery verbs.
+#
+# These TRUNCATE the file. They were allowed both before and after the read
+# normalisation, so this was never a regression, just the half nobody was
+# looking at. Found by the jainyagi.com session, who verified against the backup
+# before calling it pre-existing.
+check 'ls > ."env"        [truncates]'    DENY "$(run_bash 'ls > ."env"')"
+check 'ls >."env"         [no space]'     DENY "$(run_bash 'ls >."env"')"
+check 'echo X > .e"n"v'                   DENY "$(run_bash 'echo X > .e"n"v')"
+check 'ls > .en\v         [escaped]'      DENY "$(run_bash 'ls > .en\v')"
+check "ls > \$'\\x2eenv'    [hex]"        DENY "$(run_bash "ls > \$'\\x2eenv'")"
+check 'printf X > ."env"'                 DENY "$(run_bash 'printf X > ."env"')"
+check 'find . > ."envrc"'                 DENY "$(run_bash 'find . > ."envrc"')"
+check 'echo X >> ."env"   [append]'       DENY "$(run_bash 'echo X >> ."env"')"
+check 'ls 2> ."env"       [fd redirect]'  DENY "$(run_bash 'ls 2> ."env"')"
+# Legitimate redirects must survive the fix.
+check 'echo X > ".env.example" quoted'    ALLOW "$(run_bash 'echo X > ".env.example"')"
+check 'ls > "my notes.txt"'               ALLOW "$(run_bash 'ls > "my notes.txt"')"
+check 'cat .envelope      [word boundary]' ALLOW "$(run_bash 'cat .envelope')"
+check 'node process.env.NODE_ENV'         ALLOW "$(run_bash 'node -e "console.log(process.env.NODE_ENV)"')"
+
+echo
 echo "=== KNOWN OPEN, recorded not fixed (informational, not scored) ==="
 # A path held in a variable or produced by a substitution still passes. Closing
 # these needs the guard to track values through the shell, which is a tail with

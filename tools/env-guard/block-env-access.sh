@@ -176,6 +176,14 @@ normalise_spelling() {
       s=$(printf '%s' "$s" | sed -E 's/\\x2[eE]/./g; s/\\x65/e/g; s/\\x6[eE]/n/g; s/\\x76/v/g; s/\\x72/r/g; s/\\x63/c/g')
       ;;
   esac
+  # Drop the `$` that introduces $'...' before the quotes go, or the residue
+  # `$.env` lands between two patterns that disagree: ENV_BASH_RE accepts any
+  # non-alphanumeric before the name and matches it, while ENV_PATH_RE anchors
+  # to start-or-slash and does not. A target can then pass the gate and be
+  # invisible to the redirect check. Narrower than relaxing the anchor, which is
+  # doing real work elsewhere.
+  s="${s//\$\'/}"
+  s="${s//\$\"/}"
   s="${s//\"/}"
   s="${s//\'/}"
   s="${s//\\/}"
@@ -348,7 +356,16 @@ $(next_step_hint)"
     if echo "$stripped" | grep -qE "$ENV_BASH_RE"; then
       # The command touches a real env path. Two ways it can do harm: a verb
       # that prints the contents, or a redirect that overwrites the file.
-      if redirect_writes_env "$command"; then
+      # $stripped, NOT $command. The normalisation reached the gate and the
+      # per-stage rule but not this check, so a split spelling passed the gate,
+      # arrived here invisible, and then fell through the verb rule because
+      # `ls`, `find`, `wc`, `echo` and `printf` are all legitimate discovery
+      # verbs. `ls > ."env"` truncated the file and was allowed. Found by the
+      # jainyagi.com session on 2026-08-19, who also confirmed against the
+      # backup that this predated the normalisation rather than being caused by
+      # it: the reads were closed and the writes were left where they already
+      # were.
+      if redirect_writes_env "$stripped"; then
         block "Blocked: this command redirects output INTO an env file, which truncates it. Credentials in that file may exist nowhere else on this machine, and there is no undo.
 
 To change a variable, tell the founder the exact line and let them paste it. To document one, write to .env.example instead.
