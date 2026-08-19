@@ -341,13 +341,36 @@ async fn proxy(
     let attribution =
         loopsvault_core::attribute(&resp_body, content_type.as_deref(), &state.prices);
 
+    // A 401 after WE injected means the provider does not recognise the stored
+    // credential. That is an operational failure of the vault itself, not of
+    // the caller, and it is the single most likely thing to go wrong here: a
+    // key gets rotated at the provider and the vault goes on confidently
+    // handing out the dead one to every project that shares it.
+    //
+    // Found because a deliberately wrong key was stored on 2026-08-19 and
+    // rejected on every call while the audit reported zero alarms and outcome
+    // "injected". Technically true and operationally useless.
+    //
+    // 401 only, not 403. A 403 can mean model access or moderation, which is
+    // the caller's problem and not evidence about the credential, and paging on
+    // it would train someone to ignore the alarm.
+    let credential_rejected = status.as_u16() == 401;
+    if credential_rejected {
+        tracing::error!(
+            credential = %injection.entry.name,
+            target = %target,
+            project = %project,
+            "ALARM: the provider rejected the stored credential. It is wrong, revoked,              or belongs to another account. Run `loopsvault verify` and re-store it."
+        );
+    }
+
     state.audit.lock().unwrap().push(AuditRecord {
         at_unix: now_unix(),
         project: project.to_string(),
         credential: injection.entry.name.clone(),
         target: target.to_string(),
         outcome: Outcome::Injected,
-        alarm: false,
+        alarm: credential_rejected,
         attribution: Some(attribution),
         upstream_ms: Some(upstream_ms),
         total_ms: Some(handler_started.elapsed().as_millis() as u64),
