@@ -1,5 +1,21 @@
 # CLAUDE.md — LoopsVault
 
+## The goal (set by the founder, 2026-10-03)
+
+**Any agent, anywhere, can do the work a secret allows, and no agent can ever see the secret.**
+
+- Every kind of secret: API keys, SSH keys, database logins, signing keys, cloud logins.
+- Every agent: Claude, Codex, Grok, Cursor, Gemini, and whatever comes next.
+- Every place: a laptop, a server, the live production app.
+- The vault does the operation and hands back the result. The agent gets the use, never the value.
+- Work never stops: rules decided in advance cover routine and autonomous use; anything else asks
+  by phone or fingerprint, and a yes lasts 30 minutes.
+- No dependence on any tool's sandbox. Live servers reach a separate vault machine.
+- The first thing anyone installs on a new coding machine, Linux and macOS alike.
+
+Measure every change against this. Detail: `founder/vision-use-not-have.md` and
+`founder/decision-approvals-and-production.md`. Research: `research/2026-10-03-agents-and-linux.md`.
+
 ## Read HANDOFF.md before doing anything
 
 [`HANDOFF.md`](HANDOFF.md) is the complete design transfer from the 2026-08-17 session where this
