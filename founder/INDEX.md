@@ -13,7 +13,10 @@ See [TODO.md](TODO.md) for the consolidated task list.
 ## Index
 
 ### Vision
-<!-- vision-*.md entries -->
+
+- [vision-use-not-have.md](vision-use-not-have.md): the agent gets the use of a secret (API, SSH,
+  database, signing), never the secret, on a laptop, a server or the live app. No sandbox needed
+  (2026-10-03). Research behind it: [../research/2026-10-03-agents-and-linux.md](../research/2026-10-03-agents-and-linux.md)
 
 ### Decisions
 
