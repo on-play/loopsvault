@@ -12,6 +12,9 @@ marked.
 
 ## Needs you
 
+- [task-linux-today.md](task-linux-today.md): **Today.** Push `main`, then run one probe command on the
+  Linux machine and paste the output. Everything after that is the agent's.
+
 - [task-first-real-call.md](task-first-real-call.md) — **START HERE. Everything is staged and
   blocked on one command from you: pasting the OpenRouter key.** v1 has worked since 2026-08-17 and
   has still never brokered a real credential. The file carries the full two-step plan agreed with

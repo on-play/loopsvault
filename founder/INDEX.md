@@ -20,6 +20,10 @@ See [TODO.md](TODO.md) for the consolidated task list.
 
 ### Decisions
 
+- [decision-approvals-and-production.md](decision-approvals-and-production.md): permission by rule,
+  phone and fingerprint chosen per secret, 30-minute windows; live servers use a separate vault
+  machine; solo developers first (2026-10-03)
+
 - HTTPS interception: both, endpoint first. v1 is the explicit local endpoint only; MITM is opt-in,
   per-tool, off by default, and lands after v1 (2026-08-17, in HANDOFF.md §11)
 - Proxy implementation: native Rust. Agent Vault is a reference design, not a dependency
